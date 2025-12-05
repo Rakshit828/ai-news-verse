@@ -1,6 +1,6 @@
 # AI NewsVerse 🚀
 
-A sophisticated AI-powered news aggregation platform that delivers personalized, curated insights from multiple premium sources. Stay ahead of the curve with real-time updates, intelligent filtering, and machine learning-powered recommendations.
+A sophisticated AI-powered news aggregation platform that delivers personalized, curated insights from multiple premium sources. Stay ahead of the curve with real-time updates and intelligent filtering.
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green?logo=fastapi)
