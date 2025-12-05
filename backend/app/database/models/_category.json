@@ -1,0 +1,51 @@
+{
+  "categories": [
+    {
+      "id": "core",
+      "title": "Core AI News",
+      "subcategories": [
+        { "id": "ai-industry", "title": "Industry News" },
+        { "id": "ai-research", "title": "Research" },
+        { "id": "ai-policy", "title": "Policy & Regulation" },
+        { "id": "ai-saftey", "title": "AI Saftey" },
+        { "id": "ai-product-launches", "title": "Recent AI products"}
+      ]
+    },
+    {
+      "id": "technical",
+      "title": "Technical Part of AI",
+      "subcategories": [
+        { "id": "llm", "title": "LLMs" },
+        { "id": "cv", "title": "Computer Vision" },
+        { "id": "genai", "title": "Generative AI" }
+      ]
+    },
+    {
+      "id": "general_user_usecases",
+      "title": "AI Tools for General Users",
+      "subcategories": [
+        { "id": "ai-writing", "title": "Writing Tools" },
+        { "id": "ai-productivity", "title": "Productivity" },
+        { "id": "ai-media-tools", "title": "Image/Video/Audio Tools" }
+      ]
+    },
+    {
+      "id": "developer_usecases",
+      "title": "AI Tools for Developers",
+      "subcategories": [
+        { "id": "ai-coding", "title": "Code Generation" },
+        { "id": "mlops", "title": "MLOps" },
+        { "id": "infra", "title": "Infrastructure" }
+      ]
+    },
+    {
+      "id": "sectors",
+      "title": "Sector-Specific",
+      "subcategories": [
+        { "id": "ai-healthcare", "title": "Healthcare" },
+        { "id": "ai-finance", "title": "Finance" },
+        { "id": "ai-education", "title": "Education" }
+      ]
+    }
+  ]
+}

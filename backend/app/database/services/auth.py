@@ -1,0 +1,110 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.auth.utils import (
+    generate_password_hash,
+    verify_user,
+    create_jwt_tokens,
+)
+from app.response import AppError
+from app.auth.exceptions import (
+    InvalidEmailError,
+    InvalidPasswordError,
+    EmailAlreadyExistsError,
+)
+from app.database.models.core import Users
+from app.database.schemas.auth import UserCreateSchema, UserLogInSchema
+
+
+
+class AuthService:
+
+    async def get_user_by_uuid(self, user_uid: str, session: AsyncSession) -> Users | None:
+        """Returns the user with the respective email"""
+
+        statement = select(Users).where(Users.uuid == user_uid)
+        result = await session.execute(statement)
+        result = result.scalar_one_or_none()
+        return result
+
+    async def get_user_by_email(self, email: str, session: AsyncSession) -> Users | None:
+        """Returns the user with the respective email"""
+
+        statement = select(Users).where(Users.email == email)
+        result = await session.execute(statement)
+        result = result.scalar_one_or_none()
+        return result
+    
+    async def delete_not_verified_users(self, session: AsyncSession):
+        statement = select(Users).where(Users.is_verified == False)
+        result = await session.execute(statement)
+        for user in result.all():
+            await session.delete(user)
+        await session.commit()
+
+    async def update_is_verified(
+        self, email: str, is_verified_value: bool, session: AsyncSession
+    ):
+        user = await self.get_user_by_email(email=email, session=session)
+        user.is_verified = is_verified_value
+        await session.commit()
+        return user
+
+    async def check_is_verified(self, email: str, session: AsyncSession):
+        user = await self.get_user_by_email(email=email, session=session)
+        is_verified: bool = user.is_verified
+        return is_verified
+
+    async def delete_user(self, email: str, session: AsyncSession):
+        user = await self.get_user_by_email(email, session)
+        if not user:
+            raise AppError(InvalidEmailError())
+
+        await session.delete(user)
+        await session.commit()
+        return
+
+    async def log_in_user(self, user_data: UserLogInSchema, session: AsyncSession):
+        """Verifies the user and issues both the Access and Refresh Tokens"""
+
+        user_data_dict = user_data.model_dump()
+        email = user_data_dict.get("email")
+        user = await self.get_user_by_email(email, session)
+
+        if not user:
+            raise AppError(InvalidEmailError())
+
+        password = user_data_dict.get("password")
+        hashed_password = user.hashed_password
+        is_verified = verify_user(password, hashed_password)
+
+        if not is_verified:
+            raise AppError(InvalidPasswordError())
+
+        uuid = user.uuid
+        role = user.role
+
+        tokens = await create_jwt_tokens(user_uuid=uuid, role=role, is_login=True)
+        return tokens
+
+    async def make_account(self, user_data: UserCreateSchema, session: AsyncSession):
+        """Creates the user account on the database"""
+        user_data_dict = user_data.model_dump()
+
+        email = user_data_dict.get("email")
+        user_exists = await self.get_user_by_email(email, session)
+
+        if user_exists:
+            raise AppError(EmailAlreadyExistsError())
+
+        password = user_data_dict.get("password")
+        hashed_password = generate_password_hash(password)
+        user_data_dict["hashed_password"] = hashed_password
+        user_data_dict.pop("password")
+
+        new_user = Users(**user_data_dict)
+        session.add(new_user)
+        await session.commit()
+        await session.refresh(new_user)
+
+        return new_user
