@@ -4,38 +4,51 @@ import {
   UserCreateSchema,
   UserLogInSchema,
   UserResponseSchema,
-  TokensSchema,
 } from '../types/api.types';
 
 class AuthService {
+  /**
+   * Sign up a new user
+   * Request Body:
+   *   - firstName: string
+   *   - lastName: string
+   *   - email: string
+   *   - password: string (min 8 chars)
+   *
+   * Response: UserResponseSchema
+   */
   async signup(userData: UserCreateSchema): Promise<SuccessResponse<UserResponseSchema>> {
     return apiClient.post<UserResponseSchema>('/auth/signup', userData);
   }
 
+  /**
+   * Login user
+   * Request Body:
+   *   - email: string
+   *   - password: string
+   *
+   * Response: null
+   * Side effect: Sets httpOnly cookies with access_token and refresh_token
+   */
   async login(userData: UserLogInSchema): Promise<SuccessResponse<null>> {
-    const response = await apiClient.post<null>('/auth/login', userData);
-    // Store tokens if provided
-    if (response.data) {
-      const tokens = response.data as any as TokensSchema;
-      if (tokens.access_token) {
-        apiClient.setTokens(tokens);
-      }
-    }
-    return response;
+    return apiClient.post<null>('/auth/login', userData);
   }
 
+  /**
+   * Logout user
+   * Clears cookies and invalidates tokens
+   */
   async logout(): Promise<SuccessResponse<null>> {
-    const response = await apiClient.get<null>('/auth/logout');
-    apiClient.clearTokens();
-    return response;
+    return apiClient.get<null>('/auth/logout');
   }
 
+  /**
+   * Refresh access token
+   * This is called automatically by the axios interceptor when access token expires.
+   * The new access token is set in httpOnly cookies by the backend.
+   */
   async refreshToken(): Promise<SuccessResponse<null>> {
     return apiClient.get<null>('/auth/refresh');
-  }
-
-  isAuthenticated(): boolean {
-    return !!apiClient.getAccessToken();
   }
 }
 

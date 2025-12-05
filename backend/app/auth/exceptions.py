@@ -51,6 +51,14 @@ class InvalidEmailError(ErrorResponse[T]):
     data: T | None = None
 
 
+class EmailNotFoundError(ErrorResponse[T]):
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    status: str = "error"
+    error: str = "email_not_found_error"
+    message: str = "Email is not registered. Please register first."
+    data: T | None = None
+
+
 class EmailNotVerifiedError(ErrorResponse[T]):
     status_code: int = status.HTTP_400_BAD_REQUEST
     status: str = "error"

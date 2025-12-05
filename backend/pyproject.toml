@@ -22,6 +22,7 @@ dependencies = [
     "groq>=0.36.0",
     "redis[asyncio]>=7.1.0",
     "argon2-cffi>=25.1.0",
+    "annotated-doc>=0.0.4",
 ]
 
 [dependency-groups]

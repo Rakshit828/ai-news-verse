@@ -1,11 +1,11 @@
 // Types
 export interface Subcategory {
-  id: string;
+  subcategory_id: string;
   title: string;
 }
 
 export interface Category {
-  id: string;
+  category_id: string;
   title: string;
   subcategories: Subcategory[];
 }
@@ -21,6 +21,8 @@ export interface NewsItem {
   title: string;
   url: string;
   description: string;
+  category: string;
+  subcategory: string;
 }
 
 // Types for API request

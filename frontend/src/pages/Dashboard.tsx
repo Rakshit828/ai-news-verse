@@ -1,127 +1,313 @@
-import React, { useState } from "react";
-import { Button } from "../components/ui/button";
-import type { NewsItem } from "../types/news.types";
-import { motion, AnimatePresence } from "framer-motion";
-import { ScrollArea } from "../components/ui/scroll-area";
-import { Menu, Zap } from "lucide-react";
-import { NewsCard } from "../components/NewsCard";
+import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { TrendingUp, Sparkles, Zap, Loader, AlertCircle } from 'lucide-react';
+import { FloatingNavBar } from '../components/FloatingNavbar';
+import { NewsSection } from '../components/NewsSection';
+import { EmptyState } from '../components/EmptyState';
+import { StatsCard } from '../components/StatsCard';
+import { FilterBar } from '../components/FilterBar';
+import { useNews } from '../hooks/useNews';
+import { Card, CardContent } from '../components/ui/card';
 
-const initialNewsItems: NewsItem[] = [
-  {
-    id: 1,
-    title: "New LLM Achieves Near-Human Empathy Scores",
-    url: "https://example.com/llm-empathy ",
-    description:
-      "Researchers unveil a groundbreaking Large Language Model (LLM) that demonstrates unprecedented emotional intelligence in conversational tests. This marks a significant milestone in natural human-AI interaction capabilities.",
+// Map source names to colors and icons
+const sourceConfig = {
+  'Google News': {
+    color: 'from-blue-600 to-blue-400',
+    icon: <TrendingUp className="h-5 w-5" />,
+    label: 'Google News',
   },
-  {
-    id: 2,
-    title: "AI-Powered Drug Discovery Reduces Trial Time by 40%",
-    url: "https://example.com/ai-drugs ",
-    description:
-      "A pharmaceutical giant reports a massive reduction in the initial phases of drug development using a novel deep learning platform for molecule generation, accelerating life-saving innovations.",
+  Anthropic: {
+    color: 'from-purple-600 to-purple-400',
+    icon: <Sparkles className="h-5 w-5" />,
+    label: 'Anthropic',
   },
-  {
-    id: 3,
-    title: "Regulators Propose Global Framework for AI Safety",
-    url: "https://example.com/ai-regulation ",
-    description:
-      "Major world economies are collaborating to establish unified standards and testing procedures to mitigate systemic risks posed by advanced AI systems, ensuring ethical deployment.",
+  Openai: {
+    color: 'from-emerald-600 to-emerald-400',
+    icon: <Zap className="h-5 w-5" />,
+    label: 'OpenAI',
   },
-  {
-    id: 4,
-    title: "The Rise of Generative AI in Code Automation",
-    url: "https://example.com/generative-code ",
-    description:
-      "Code-generating AI assistants are moving beyond suggestions, now writing up to 70% of production-ready code in specific software domains, boosting developer productivity.",
-  },
-  {
-    id: 5,
-    title: "Quantum Computing Boosts Neural Network Training",
-    url: "https://example.com/quantum-ai ",
-    description:
-      "A new hybrid quantum-classical computing approach slashes training time for massive neural networks, promising faster development cycles and deeper learning models.",
-  },
-  {
-    id: 6,
-    title: "Ethical AI Audits Mandatory for Public Sector Use",
-    url: "https://example.com/ethical-audit ",
-    description:
-      "New governmental policies enforce mandatory, independent ethical audits for all AI systems deployed in public services starting next quarter to maintain public trust.",
-  },
+};
+
+interface NewsArticle {
+  title: string;
+  url: string;
+  description: string;
+  news_from: 'Google News' | 'Anthropic' | 'Openai';
+}
+
+interface GroupedNews {
+  [key: string]: NewsArticle[];
+}
+
+const filters = [
+  { label: 'All News', value: 'all' },
+  { label: 'Google News', value: 'Google News' },
+  { label: 'Anthropic', value: 'Anthropic' },
+  { label: 'OpenAI', value: 'Openai' },
 ];
 
-// --- Main Dashboard Component (Final Dark Blue Theme) ---
-export const AINewsDashboard: React.FC = () => {
-  const [news, setNews] = useState(initialNewsItems);
-  const removeItem = (id: number) =>
-    setNews((prev) => prev.filter((i) => i.id !== id));
+export const Dashboard: React.FC = () => {
+  const { news, loading, error, categories, getTodayNews } = useNews();
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [removedArticles, setRemovedArticles] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Flatten and filter news articles
+  const allArticles = useMemo(() => {
+    if (!news) return [];
+
+    const articles: NewsArticle[] = [];
+
+    // Combine all news from different sources
+    if (news.google && Array.isArray(news.google)) {
+      articles.push(
+        ...news.google.map((item) => ({
+          ...item,
+          news_from: 'Google News' as const,
+        })),
+      );
+    }
+
+    if (news.anthropic && Array.isArray(news.anthropic)) {
+      articles.push(
+        ...news.anthropic.map((item) => ({
+          ...item,
+          news_from: 'Anthropic' as const,
+        })),
+      );
+    }
+
+    if (news.openai && Array.isArray(news.openai)) {
+      articles.push(
+        ...news.openai.map((item) => ({
+          ...item,
+          news_from: 'Openai' as const,
+        })),
+      );
+    }
+
+    // Filter out removed articles
+    return articles.filter((article) => !removedArticles.has(article.url));
+  }, [news, removedArticles]);
+
+  // Filter articles based on active filter
+  const filteredArticles = useMemo(() => {
+    if (activeFilter === 'all') return allArticles;
+    return allArticles.filter((article) => article.news_from === activeFilter);
+  }, [allArticles, activeFilter]);
+
+  // Group articles by source
+  const groupedNews: GroupedNews = useMemo(() => {
+    const groups: GroupedNews = {};
+
+    filteredArticles.forEach((article) => {
+      const source = article.news_from;
+      if (!groups[source]) {
+        groups[source] = [];
+      }
+      groups[source].push(article);
+    });
+
+    return groups;
+  }, [filteredArticles]);
+
+  const handleRemoveArticle = (url: string) => {
+    setRemovedArticles((prev) => new Set(prev).add(url));
+  };
+
+  // Determine which empty state to show
+  const getEmptyStateType = () => {
+    // If categories are not set, show "no-categories"
+    if (!categories || categories.length === 0) {
+      return 'no-categories';
+    }
+
+    // If error occurred while fetching news, show "error"
+    if (error) {
+      return 'error';
+    }
+
+    // If categories are set but no news available, show "no-news"
+    return 'no-news';
+  };
+
+  // Calculate stats
+  const stats = [
+    {
+      icon: <TrendingUp className="h-5 w-5" />,
+      label: 'Total Articles',
+      value: allArticles.length,
+      color: 'blue' as const,
+    },
+    {
+      icon: <Sparkles className="h-5 w-5" />,
+      label: 'Sources',
+      value: Object.keys(groupedNews).length,
+      color: 'cyan' as const,
+    },
+    {
+      icon: <Zap className="h-5 w-5" />,
+      label: 'Live Updates',
+      value: 'Active',
+      color: 'amber' as const,
+    },
+  ];
 
   return (
-    /* --------------  DARK-BLUE THEME -------------- */
-    <div className="min-h-screen w-full bg-linear-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-100 flex flex-col items-center">
-                  {/* sticky header – slightly transparent blue-black */}     {" "}
-      <header className="sticky top-0 z-10 w-full bg-slate-950/80 backdrop-blur-md border-b border-sky-600/30 shadow-lg px-6 py-4">
-               {" "}
-        <div className="flex justify-between items-center max-w-6xl mx-auto">
-                   {" "}
-          <div className="flex items-center space-x-2">
-                        <Zap className="h-6 w-6 text-sky-400 animate-pulse" /> 
-                     {" "}
-            <h1 className="text-2xl font-extrabold tracking-widest text-transparent bg-clip-text bg-linear-to-r from-sky-300 to-sky-500">
-                            AiNewsVerse            {" "}
-            </h1>
-                     {" "}
-          </div>
-                   {" "}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-slate-300 hover:text-white"
+    <div className="min-h-screen w-full bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Floating NavBar */}
+      <FloatingNavBar />
+
+      {/* Main Content */}
+      <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Section */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
           >
-                        <Menu className="h-5 w-5" />         {" "}
-          </Button>
-                 {" "}
-        </div>
-             {" "}
-      </header>
-            {/* scrollable feed – subtle blue tint to separate from bg */}     {" "}
-      <ScrollArea className="w-full max-w-6xl p-6 grow">
-               {" "}
-        <div className="mb-6 text-xl font-semibold text-sky-300/90 border-b border-sky-600/20 pb-2">
-                    Live AI Breakthroughs Feed        {" "}
-        </div>
-                       {" "}
-        <AnimatePresence initial={false}>
-                   {" "}
-          {news.length > 0 ? (
-            <div className="grid gap-8 auto-rows-min sm:grid-cols-2 lg:grid-cols-3">
-                           {" "}
-              {news.map((item) => (
-                <NewsCard key={item.id} item={item} onRemove={removeItem} />
-              ))}
-                         {" "}
-            </div>
-          ) : (
+            <h1 className="text-4xl font-bold bg-linear-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent mb-2">
+              Your AI News Feed
+            </h1>
+            <p className="text-slate-400">
+              Stay updated with the latest breakthroughs in artificial
+              intelligence
+            </p>
+          </motion.div>
+
+          {/* Loading State */}
+          {loading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-8 p-6 bg-blue-600/10 border border-blue-600/30 rounded-lg backdrop-blur-sm flex items-center space-x-3"
+            >
+              <Loader className="h-5 w-5 text-blue-400 animate-spin" />
+              <p className="text-blue-300">
+                Loading your personalized news feed...
+              </p>
+            </motion.div>
+          )}
+
+          {/* Error Banner (separate from empty state) */}
+          {!loading && error && allArticles.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-8"
+            >
+              <Card className="bg-yellow-900/20 border-yellow-700/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-yellow-300 font-semibold">
+                        Note: Could not fetch news
+                      </p>
+                      <p className="text-yellow-400/80 text-sm mt-1">
+                        {error.message}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Stats Grid - Only show when there are articles */}
+          {!loading && allArticles.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center text-sky-400 mt-12 p-10 border border-dashed border-sky-800/40 rounded-lg max-w-lg mx-auto bg-slate-900/50"
+              transition={{ delay: 0.1 }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
             >
-                            <p className="text-3xl mb-4">✨</p>             {" "}
-              <p className="text-xl font-medium mb-2">All Clear!</p>           
-               {" "}
-              <p className="text-slate-400">
-                You've successfully reviewed the latest AI news.
-              </p>
-                         {" "}
+              {stats.map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 + index * 0.05 }}
+                >
+                  <StatsCard {...stat} />
+                </motion.div>
+              ))}
             </motion.div>
           )}
-                 {" "}
-        </AnimatePresence>
-             {" "}
-      </ScrollArea>
-         {" "}
+
+          {/* Filter Bar - Only show when there are articles */}
+          {!loading && allArticles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mb-8 p-4 bg-slate-800/40 border border-slate-700/50 rounded-lg backdrop-blur-sm"
+            >
+              <FilterBar
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                filters={filters}
+              />
+            </motion.div>
+          )}
+
+          {/* News Feed */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            {!loading && allArticles.length === 0 ? (
+              <EmptyState
+                type={getEmptyStateType()}
+                onRetry={getTodayNews}
+              />
+            ) : (
+              <div>
+                {Object.entries(groupedNews).map(
+                  ([source, articles], index) => {
+                    const config =
+                      sourceConfig[source as keyof typeof sourceConfig];
+
+                    return (
+                      <motion.div
+                        key={source}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 + index * 0.1 }}
+                      >
+                        <NewsSection
+                          title={config.label}
+                          news={articles.map((article, idx) => ({
+                            id: idx,
+                            title: article.title,
+                            url: article.url,
+                            description: article.description,
+                            category: source,
+                            subcategory: source,
+                          }))}
+                          onRemove={(id) => {
+                            // Get the article URL from the articles array using the id
+                            const article = articles[id];
+                            if (article && article.url) {
+                              handleRemoveArticle(article.url);
+                            }
+                          }}
+                          icon={config.icon}
+                        />
+                      </motion.div>
+                    );
+                  },
+                )}
+              </div>
+            )}
+          </motion.div>
+        </div>
+      </main>
     </div>
   );
 };
+
+export default Dashboard;

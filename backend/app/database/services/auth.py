@@ -11,6 +11,7 @@ from app.auth.exceptions import (
     InvalidEmailError,
     InvalidPasswordError,
     EmailAlreadyExistsError,
+    EmailNotFoundError
 )
 from app.database.models.core import Users
 from app.database.schemas.auth import UserCreateSchema, UserLogInSchema
@@ -34,6 +35,7 @@ class AuthService:
         result = await session.execute(statement)
         result = result.scalar_one_or_none()
         return result
+    
     
     async def delete_not_verified_users(self, session: AsyncSession):
         statement = select(Users).where(Users.is_verified == False)
@@ -72,7 +74,7 @@ class AuthService:
         user = await self.get_user_by_email(email, session)
 
         if not user:
-            raise AppError(InvalidEmailError())
+            raise AppError(EmailNotFoundError())
 
         password = user_data_dict.get("password")
         hashed_password = user.hashed_password

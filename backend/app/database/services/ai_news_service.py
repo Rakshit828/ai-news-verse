@@ -226,8 +226,8 @@ class AiNewsService:
                     )
                 )
             user_categories_orm = [
-                UserCategory(user_id=user_id, category_id=category.category_id)
-                for category in category_ids
+                UserCategory(user_id=user_id, category_id=category_id)
+                for category_id in category_ids
             ]
             session.add_all(user_categories_orm)
 
@@ -261,9 +261,9 @@ class AiNewsService:
         categories_data: List[SetCategorySchema] = categories_data.categories_data
         new_categories_id = [category.category_id for category in categories_data]
         new_subcategories_id = [
-            subcategory.subcategory_id
+            subcategory_id
             for category in categories_data
-            for subcategory in category.subcategories
+            for subcategory_id in category.subcategories
         ]
 
         user_categories: List[ResponseCategoryData] = (
@@ -272,6 +272,7 @@ class AiNewsService:
                 categories_data=categories_data,
                 category_ids=new_categories_id,
                 subcategory_ids=new_subcategories_id,
+                session=session
             )
         )
         return user_categories

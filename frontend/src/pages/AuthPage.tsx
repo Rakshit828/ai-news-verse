@@ -1,38 +1,80 @@
 import type { LoginFormData, RegisterFormData } from "../types/auth.types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, Newspaper, Zap, Shield } from "lucide-react";
 import LoginForm from "../components/auth/LoginForm";
 import RegisterForm from "../components/auth/RegisterForm";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card";
-import { authService } from "../api/auth.api";
 import { useToast } from "../context/ToastContext";
 import { FullScreenLoader } from "../components/LoadingSpinner";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { UserCreateSchema, UserLogInSchema } from "../types/api.types";
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLocalLoading, setIsLocalLoading] = useState(false);
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const { login, signup, loading: authLoading, isAuthenticated } = useAuth();
+
+  // Watch for authentication state change and redirect
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const handleLogin = async (data: LoginFormData) => {
-    setIsLoading(true);
-    const response = await authService.handleUserLogin(data);
-    console.log("The response data is : ", response.data.message)
-    if (response.success){
-      showToast(response.data.message, "success");
-    } else {
-      showToast(response.data.message, "error")
+    setIsLocalLoading(true);
+    try {
+      // Transform LoginFormData to UserLogInSchema
+      const loginPayload: UserLogInSchema = {
+        email: data.email,
+        password: data.password,
+      };
+
+      // Call context login method which updates auth state
+      await login(loginPayload);
+      
+      // Show success message (redirect will happen via useEffect)
+      showToast("Logged in successfully!", "success");
+    } catch (error: any) {
+      // Handle error
+      const errorMessage = error?.message || "Login failed. Please try again.";
+      showToast(errorMessage, "error");
+      console.error("Login error:", error);
+    } finally {
+      setIsLocalLoading(false);
     }
-  
   };
 
   const handleRegister = async (data: RegisterFormData) => {
-    setIsLoading(true);
-    const response = await authService.handleUserSignup(data);
-    console.log("The response data is : ", response.data)
-    if (response.success){
-      showToast("Registered Successfully", "success");
-    } else {
-      showToast(response.data, "error")
+    setIsLocalLoading(true);
+    try {
+      // Transform RegisterFormData to UserCreateSchema
+      const signupPayload: UserCreateSchema = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: data.password,
+      };
+
+      // Call context signup method which updates auth state
+      await signup(signupPayload);
+
+      showToast("Account created successfully! Please log in.", "success");
+      
+      // Switch to login form
+      setTimeout(() => {
+        setIsLogin(true);
+      }, 1000);
+    } catch (error: any) {
+      // Handle error
+      const errorMessage = error?.message || "Registration failed. Please try again.";
+      showToast(errorMessage, "error");
+      console.error("Registration error:", error);
+    } finally {
+      setIsLocalLoading(false);
     }
   };
 
@@ -66,6 +108,8 @@ const AuthPage = () => {
     { value: "24/7", label: "Live Coverage" },
   ];
 
+  const isLoading = isLocalLoading || authLoading;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
       {isLoading && (
@@ -83,7 +127,7 @@ const AuthPage = () => {
               <div className="bg-linear-to-br from-blue-500 to-indigo-600 p-3 rounded-xl shadow-lg">
                 <Sparkles className="h-8 w-8 text-white" />
               </div>
-              <span className="text-3xl font-bold text-white">AI News Hub</span>
+              <span className="text-3xl font-bold text-white">AI News Verse</span>
             </div>
 
             <div className="mb-6">

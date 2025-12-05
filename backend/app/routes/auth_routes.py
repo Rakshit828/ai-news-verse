@@ -70,11 +70,11 @@ async def create_account(
     return SuccessResponse[UserResponseSchema](
         status_code=status.HTTP_201_CREATED,
         message="Account Created Successfully",
-        data=user,
+        data=user.__dict__,
     )
 
 
-@auth_routes.post("/login", response_model=SuccessResponse[None])
+@auth_routes.post("/login", response_model=SuccessResponse[UserResponseSchema])
 async def login(
     response: Response,
     user_data: UserLogInSchema,
@@ -85,9 +85,11 @@ async def login(
         set_tokens_dev(response=response, tokens_dict=tokens)
     else:
         set_tokens_production(response=response, tokens_dict=tokens)
-    return SuccessResponse[None](
+    user = await auth_service.get_user_by_email(email=user_data.email, session=session)
+    return SuccessResponse[UserResponseSchema](
         message="Logged In Successfully.",
         status_code=status.HTTP_200_OK,
+        data=user.__dict__
     )
 
 

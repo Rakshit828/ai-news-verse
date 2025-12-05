@@ -1,4 +1,7 @@
+// ============================================================================
 // Core Response Types
+// ============================================================================
+
 export interface ResponseBase<T = null> {
   status: 'success' | 'error';
   message: string;
@@ -17,14 +20,15 @@ export interface ErrorResponse<T = null> extends ResponseBase<T> {
   error: string;
 }
 
-// Auth Types
+// ============================================================================
+// Authentication Types
+// ============================================================================
+
 export interface UserResponseSchema {
-  uuid: string;
   first_name: string;
   last_name: string;
   email: string;
-  is_verified: boolean;
-  role: string;
+  role: 'admin' | 'user';
   created_at: string;
 }
 
@@ -45,7 +49,17 @@ export interface TokensSchema {
   refresh_token: string;
 }
 
-// News Service Types
+export interface AuthTokenPayload {
+  sub: string; // user UUID
+  role: string;
+  iat: number;
+  exp: number;
+}
+
+// ============================================================================
+// News Service - Categories Types
+// ============================================================================
+
 export interface SubCategorySchema {
   subcategory_id: string;
   title: string;
@@ -87,22 +101,25 @@ export interface AddSubcategoriesToCategorySchema {
   subcategories: CreateSubcategorySchema[];
 }
 
-export interface ArticleResponse {
+// ============================================================================
+// News Service - Article Types
+// ============================================================================
+
+export interface BaseArticleResponse {
   title: string;
   url: string;
   description: string;
-  news_from?: string;
 }
 
-export interface GoogleNewsResponse extends ArticleResponse {
+export interface GoogleNewsResponse extends BaseArticleResponse {
   news_from: 'Google News';
 }
 
-export interface AnthropicNewsResponse extends ArticleResponse {
+export interface AnthropicNewsResponse extends BaseArticleResponse {
   news_from: 'Anthropic';
 }
 
-export interface OpenaiNewsResponse extends ArticleResponse {
+export interface OpenaiNewsResponse extends BaseArticleResponse {
   news_from: 'Openai';
 }
 
@@ -112,9 +129,13 @@ export interface TodayNewsResponse {
   openai: OpenaiNewsResponse[];
 }
 
-// API Error Handler
-export interface ApiError extends Error {
-  status_code?: number;
-  error?: string;
+// ============================================================================
+// HTTP Error Details
+// ============================================================================
+
+export interface ApiErrorDetails {
   message: string;
+  status_code: number;
+  error: string;
+  data?: any;
 }

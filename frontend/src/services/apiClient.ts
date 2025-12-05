@@ -3,22 +3,23 @@ import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
 } from 'axios';
-import { SuccessResponse, ErrorResponse, TokensSchema } from '../types/api.types';
+import { SuccessResponse, ErrorResponse, ApiErrorDetails } from '../types/api.types';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 class ApiClient {
   private client: AxiosInstance;
   private isRefreshing = false;
   private failedQueue: Array<{
-    resolve: (value: string) => void;
-    reject: (reason?: any) => void;
+    resolve: () => void;
+    reject: (error: any) => void;
   }> = [];
 
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      withCredentials: true, // Include cookies
+      withCredentials: true, // Include cookies with requests
+      timeout: 30000,
     });
 
     this.setupInterceptors();
@@ -28,10 +29,6 @@ class ApiClient {
     // Request Interceptor
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = this.getAccessToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
         return config;
       },
       (error) => Promise.reject(error)
@@ -47,40 +44,35 @@ class ApiClient {
 
         // Handle 401 Unauthorized - Token Expired
         if (error.response?.status === 401 && !originalRequest._retry) {
+          // If already refreshing, queue the request
           if (this.isRefreshing) {
             return new Promise((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject });
-            })
-              .then((token) => {
-                if (originalRequest.headers) {
-                  originalRequest.headers.Authorization = `Bearer ${token}`;
-                }
-                return this.client(originalRequest);
-              })
-              .catch((err) => Promise.reject(err));
+              this.failedQueue.push({
+                resolve: () => resolve(this.client(originalRequest)),
+                reject,
+              });
+            });
           }
 
           originalRequest._retry = true;
           this.isRefreshing = true;
 
           try {
-            const newToken = await this.refreshAccessToken();
-            this.setAccessToken(newToken);
-            
-            // Retry failed requests
-            this.failedQueue.forEach((prom) => prom.resolve(newToken));
+            // Call refresh endpoint - cookies will be updated automatically
+            await this.client.get('/auth/refresh');
+
+            // Process all queued requests
+            this.failedQueue.forEach((prom) => prom.resolve());
             this.failedQueue = [];
 
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            }
+            // Retry the original request
             return this.client(originalRequest);
           } catch (refreshError) {
+            // Refresh failed, reject all queued requests
             this.failedQueue.forEach((prom) => prom.reject(refreshError));
             this.failedQueue = [];
-            
-            // Clear tokens and redirect to login
-            this.clearTokens();
+
+            // Redirect to login
             window.location.href = '/login';
             return Promise.reject(refreshError);
           } finally {
@@ -93,33 +85,9 @@ class ApiClient {
     );
   }
 
-  private async refreshAccessToken(): Promise<string> {
-    const response = await this.client.get<SuccessResponse<null>>('/auth/refresh');
-    if (response.data.data === null) {
-      throw new Error('Failed to refresh token');
-    }
-    // The new access token is set in cookies via the backend
-    return this.getAccessToken() || '';
-  }
-
-  public setTokens(tokens: TokensSchema) {
-    // Tokens are set in httpOnly cookies by the backend
-    // But we can store the access token in memory for convenience
-    sessionStorage.setItem('access_token_temp', tokens.access_token);
-  }
-
-  public setAccessToken(token: string) {
-    sessionStorage.setItem('access_token_temp', token);
-  }
-
-  public getAccessToken(): string | null {
-    return sessionStorage.getItem('access_token_temp');
-  }
-
-  public clearTokens() {
-    sessionStorage.removeItem('access_token_temp');
-  }
-
+  /**
+   * Make a generic HTTP request
+   */
   public async request<T = null>(
     method: string,
     url: string,
@@ -134,34 +102,67 @@ class ApiClient {
         ...config,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
+  /**
+   * GET request
+   */
   public get<T = null>(url: string, config?: any): Promise<SuccessResponse<T>> {
     return this.request<T>('GET', url, undefined, config);
   }
 
+  /**
+   * POST request
+   */
   public post<T = null>(url: string, data?: any, config?: any): Promise<SuccessResponse<T>> {
     return this.request<T>('POST', url, data, config);
   }
 
+  /**
+   * PUT request
+   */
   public put<T = null>(url: string, data?: any, config?: any): Promise<SuccessResponse<T>> {
     return this.request<T>('PUT', url, data, config);
   }
 
+  /**
+   * DELETE request
+   */
   public delete<T = null>(url: string, config?: any): Promise<SuccessResponse<T>> {
     return this.request<T>('DELETE', url, undefined, config);
   }
 
-  private handleError(error: AxiosError<ErrorResponse>): Error {
-    const message = error.response?.data?.message || error.message || 'An error occurred';
-    const status_code = error.response?.data?.status_code || error.response?.status;
-    const apiError = new Error(message) as any;
-    apiError.status_code = status_code;
-    apiError.error = error.response?.data?.error;
-    return apiError;
+  /**
+   * Handle axios errors and convert to ApiErrorDetails
+   */
+  private handleError(error: any): ApiErrorDetails {
+    if (axios.isAxiosError(error)) {
+      const response = error.response?.data as ErrorResponse;
+      const errorDetails: ApiErrorDetails = {
+        message: response?.message || error.message || 'An unknown error occurred',
+        status_code: error.response?.status || 500,
+        error: response?.error || 'UNKNOWN_ERROR',
+        data: response?.data,
+      };
+      throw errorDetails;
+    }
+
+    // Non-axios error
+    throw {
+      message: error.message || 'An unknown error occurred',
+      status_code: 500,
+      error: 'UNKNOWN_ERROR',
+    };
+  }
+
+  /**
+   * Check if user needs to re-login based on error
+   */
+  public needsRelogin(error: any): boolean {
+    return error?.status_code === 401;
   }
 }
 

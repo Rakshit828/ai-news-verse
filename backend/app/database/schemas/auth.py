@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from uuid import UUID
 from datetime import datetime
 
@@ -16,16 +16,13 @@ class UserLogInSchema(BaseModel):
 
 
 class UserResponseSchema(BaseModel):
-    uuid: UUID
     first_name: str
     last_name: str
     email: EmailStr
-    is_verified: bool
     role: str
     created_at: datetime
 
-    class Config:
-        orm_model = True
+    model_config = ConfigDict(extra='ignore')
 
 
 class RegisterAccountResponseSchema(BaseModel):

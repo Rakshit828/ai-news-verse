@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { authService } from '../services/authService';
-import { UserResponseSchema, UserCreateSchema, UserLogInSchema } from '../types/api.types';
+import {
+  UserResponseSchema,
+  UserCreateSchema,
+  UserLogInSchema,
+} from '../types/api.types';
 
 interface AuthContextType {
   user: UserResponseSchema | null;
@@ -10,6 +14,7 @@ interface AuthContextType {
   login: (data: UserLogInSchema) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,17 +23,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponseSchema | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   const signup = useCallback(async (data: UserCreateSchema) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await authService.signup(data);
-      if (response.data) {
-        setUser(response.data);
-      }
+      await authService.signup(data);
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || 'Signup failed';
+      setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
@@ -39,11 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      await authService.login(data);
-      // Note: You might want to fetch user data here
-      setUser({} as UserResponseSchema); // Placeholder
+      const response = await authService.login(data);
+      if (response.data) {
+        setUser(response.data);
+        setIsAuthenticated(true);
+      }
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || 'Login failed';
+      setError(errorMessage);
+      setIsAuthenticated(false);
       throw err;
     } finally {
       setLoading(false);
@@ -56,35 +68,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await authService.logout();
       setUser(null);
+      setIsAuthenticated(false);
     } catch (err: any) {
-      setError(err.message);
-      throw err;
+      const errorMessage = err.message || 'Logout failed';
+      setError(errorMessage);
+      // Still logout locally even if backend call fails
+      setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        error,
-        signup,
-        login,
-        logout,
-        isAuthenticated: authService.isAuthenticated(),
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value: AuthContextType = {
+    user,
+    loading,
+    error,
+    signup,
+    login,
+    logout,
+    isAuthenticated,
+    clearError,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }
