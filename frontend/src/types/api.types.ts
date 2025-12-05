@@ -125,10 +125,15 @@ export interface OpenaiNewsResponse extends BaseArticleResponse {
   news_from: 'Openai';
 }
 
+export interface HackernoonResponse extends BaseArticleResponse {
+  news_from: 'Hackernoon';
+}
+
 export interface TodayNewsResponse {
   google: GoogleNewsResponse[];
   anthropic: AnthropicNewsResponse[];
   openai: OpenaiNewsResponse[];
+  hackernoon: HackernoonResponse[]
 }
 
 // ============================================================================

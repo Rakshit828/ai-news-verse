@@ -28,10 +28,15 @@ const sourceConfig = {
     icon: <Zap className="h-5 w-5" />,
     label: 'OpenAI',
   },
+  Hackernoon: {
+    color: 'from-emerald-600 to-emerald-400',
+    icon: <Zap className="h-5 w-5" />,
+    label: 'Hackernoon',
+  },
 };
 
 interface NewsArticleWithSource extends BaseArticleResponse {
-  news_from: 'Google News' | 'Anthropic' | 'Openai';
+  news_from: 'Google News' | 'Anthropic' | 'Openai' | 'Hackernoon';
 }
 
 interface GroupedNews {
@@ -43,6 +48,7 @@ const filters = [
   { label: 'Google News', value: 'Google News' },
   { label: 'Anthropic', value: 'Anthropic' },
   { label: 'OpenAI', value: 'Openai' },
+  { label: 'Hackernoon', value: 'Hackernoon' },
 ];
 
 export const Dashboard: React.FC = () => {
@@ -90,6 +96,15 @@ export const Dashboard: React.FC = () => {
         ...news.openai.map((item) => ({
           ...item,
           news_from: 'Openai' as const,
+        })),
+      );
+    }
+
+    if (news.hackernoon && Array.isArray(news.hackernoon)) {
+      articles.push(
+        ...news.hackernoon.map((item) => ({
+          ...item,
+          news_from: 'Hackernoon' as const,
         })),
       );
     }
@@ -156,7 +171,7 @@ export const Dashboard: React.FC = () => {
     {
       icon: <Zap className="h-5 w-5" />,
       label: 'Live Updates',
-      value: 'Active',
+      value: 'Deactive',
       color: 'amber' as const,
     },
   ];

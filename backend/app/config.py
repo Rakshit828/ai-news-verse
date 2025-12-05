@@ -12,6 +12,7 @@ class Config(BaseSettings):
 
     ANTHROPIC_RSS_URLS: str
     OPENAI_RSS_URLS: str
+    HACKERNOON_RSS_URL: str
 
     model_config = SettingsConfigDict(
         env_file='.env.dev',

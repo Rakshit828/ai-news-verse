@@ -51,14 +51,20 @@ class GoogleArticle(ScrapedArticle):
 
 class AnthropicArticle(ScrapedArticle):
     article_from: str = 'ANTHROPIC'
-    category: Category  | None = None
+    category: Category  
     sub_category: SubCategory | None = None
 
 
 class OpenAiArticle(ScrapedArticle):
     article_from: str = 'OPENAI'
-    category: Category  | None = None
+    category: Category  
     sub_category: SubCategory | None = None
 
 
-ClassifiedArticle: TypeAlias = GoogleArticle | AnthropicArticle | OpenAiArticle
+class HackernoonArticle(ScrapedArticle):
+    article_from: str = 'HACKERNOON'
+    category: Category  
+    sub_category: SubCategory | None = None
+
+
+ClassifiedArticle: TypeAlias = GoogleArticle | AnthropicArticle | OpenAiArticle | HackernoonArticle

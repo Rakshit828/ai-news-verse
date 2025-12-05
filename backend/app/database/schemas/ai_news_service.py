@@ -71,9 +71,13 @@ class AnthropicNewsResponse(BaseArticleResponse):
 class OpenaiNewsResponse(BaseArticleResponse):
     news_from: str = 'Openai'
 
+class HackernoonResponse(BaseArticleResponse):
+    news_from: str = 'Hackernoon'
+
 
 class TodayNewsResponse(BaseModel):
     google: List[GoogleNewsResponse]
     anthropic: List[AnthropicNewsResponse]
     openai: List[OpenaiNewsResponse]
+    hackernoon: List[HackernoonResponse]
 

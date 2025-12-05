@@ -11,6 +11,7 @@ from app.database.models.ai_news_service import (
     AnthropicArticles,
     GoogleArticles,
     OpenAiArticles,
+    HackernoonArticles,
 )
 from app.database.models.core import (
     Category,
@@ -42,7 +43,15 @@ from app.news_service.exceptions import (
 async def prepare_article(articles):
     result_articles = []
     for row in articles:
-        result_articles.append({"title": row[0], "url": row[1], "description": row[2], "category_id": row[3], "subcategory_id": row[4]})
+        result_articles.append(
+            {
+                "title": row[0],
+                "url": row[1],
+                "description": row[2],
+                "category_id": row[3],
+                "subcategory_id": row[4],
+            }
+        )
     return result_articles
 
 
@@ -76,8 +85,6 @@ class AiNewsService:
                     )
                     session.add(sub_cat)
             await session.commit()
-    
-
 
     async def get_categories_data(self, session: AsyncSession) -> CategoriesData:
         """Returs the full category and subcategory data from the table except custom ones."""
@@ -274,7 +281,7 @@ class AiNewsService:
                 categories_data=categories_data,
                 category_ids=new_categories_id,
                 subcategory_ids=new_subcategories_id,
-                session=session
+                session=session,
             )
         )
         return user_categories
@@ -588,7 +595,11 @@ class AiNewsService:
         )
 
         statement_google = select(
-            GoogleArticles.title, GoogleArticles.url, GoogleArticles.description, GoogleArticles.category_id, GoogleArticles.subcategory_id
+            GoogleArticles.title,
+            GoogleArticles.url,
+            GoogleArticles.description,
+            GoogleArticles.category_id,
+            GoogleArticles.subcategory_id,
         ).where(
             GoogleArticles.published_on >= today,
             GoogleArticles.subcategory_id.in_(user_subcategories),
@@ -598,37 +609,57 @@ class AiNewsService:
             AnthropicArticles.url,
             AnthropicArticles.description,
             AnthropicArticles.category_id,
-            AnthropicArticles.subcategory_id
+            AnthropicArticles.subcategory_id,
         ).where(
             AnthropicArticles.published_on >= today,
             AnthropicArticles.subcategory_id.in_(user_subcategories),
         )
         statement_openai = select(
-            OpenAiArticles.title, OpenAiArticles.url, OpenAiArticles.description, OpenAiArticles.category_id, OpenAiArticles.subcategory_id
+            OpenAiArticles.title,
+            OpenAiArticles.url,
+            OpenAiArticles.description,
+            OpenAiArticles.category_id,
+            OpenAiArticles.subcategory_id,
         ).where(
             OpenAiArticles.published_on >= today,
             OpenAiArticles.subcategory_id.in_(user_subcategories),
         )
+        statement_hackernoon = select(
+            HackernoonArticles.title,
+            HackernoonArticles.url,
+            HackernoonArticles.description,
+            HackernoonArticles.category_id,
+            HackernoonArticles.subcategory_id,
+        ).where(
+            HackernoonArticles.published_on >= today,
+            HackernoonArticles.subcategory_id.in_(user_subcategories),
+        )
 
-        google_articles, anthropic_articles, openai_articles = await asyncio.gather(
-            self.fetch_from_db(statement_google, session=session, to="rows"),
-            self.fetch_from_db(statement_anthropic, session=session, to="rows"),
-            self.fetch_from_db(statement_openai, session=session, to="rows"),
+        google_articles, anthropic_articles, openai_articles, hackernoon_articles = (
+            await asyncio.gather(
+                self.fetch_from_db(statement_google, session=session, to="rows"),
+                self.fetch_from_db(statement_anthropic, session=session, to="rows"),
+                self.fetch_from_db(statement_openai, session=session, to="rows"),
+                self.fetch_from_db(statement_hackernoon, session=session, to="rows"),
+            )
         )
 
         (
             response_google_articles,
             response_anthropic_articles,
             response_openai_articles,
+            response_hackernoon_articles,
         ) = await asyncio.gather(
             prepare_article(google_articles),
             prepare_article(anthropic_articles),
             prepare_article(openai_articles),
+            prepare_article(hackernoon_articles),
         )
         today_news_response = TodayNewsResponse(
             google=response_google_articles,
             anthropic=response_anthropic_articles,
             openai=response_openai_articles,
+            hackernoon=response_hackernoon_articles,
         )
         return today_news_response
 

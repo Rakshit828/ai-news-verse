@@ -1,5 +1,5 @@
 from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy import func, ForeignKey, Index
+from sqlalchemy import  ForeignKey, Index
 import sqlalchemy.dialects.postgresql as pg
 from typing import Optional
 
@@ -15,7 +15,7 @@ class GoogleArticles(Base):
     description: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     url: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
-        pg.TIMESTAMP(timezone=True), server_default=func.now()
+        pg.TIMESTAMP(timezone=True)
     )
     markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
@@ -41,7 +41,7 @@ class AnthropicArticles(Base):
     description: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     url: Mapped[str] = mapped_column(pg.VARCHAR(200), nullable=False)
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
-        pg.TIMESTAMP(timezone=True), server_default=func.now()
+        pg.TIMESTAMP(timezone=True)
     )
     markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
@@ -67,7 +67,7 @@ class OpenAiArticles(Base):
     description: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     url: Mapped[str] = mapped_column(pg.VARCHAR(200), nullable=False)
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
-        pg.TIMESTAMP(timezone=True), server_default=func.now()
+        pg.TIMESTAMP(timezone=True)
     )
     markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
@@ -83,4 +83,32 @@ class OpenAiArticles(Base):
     __table_args__ = (
         Index("idx_openai_published_on", "published_on"),
         Index("idx_openai_subcategory_id", "subcategory_id")
+    )
+
+
+
+
+class HackernoonArticles(Base):
+    __tablename__ = "hackernoon_articles"
+
+    guid: Mapped[str] = mapped_column(pg.TEXT, primary_key=True)
+    title: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    description: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    url: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    published_on: Mapped[pg.TIMESTAMP] = mapped_column(
+        pg.TIMESTAMP(timezone=True)
+    )
+    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
+
+    category_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("news_categories.category_id", ondelete="SET NULL"), nullable=False
+    )
+    subcategory_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("news_subcategories.subcategory_id", ondelete="SET NULL"), nullable=True
+    )
+
+    __table_args__ = (
+        Index("idx_hackernoon_published_on", "published_on"),
+        Index("idx_hackernoon_subcategory_id", "subcategory_id")
     )
