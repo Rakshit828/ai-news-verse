@@ -22,6 +22,8 @@ class CategoriesData(BaseModel):
 class ClassifiedCategory(BaseModel):
     category: Category
     subcategory: SubCategory
+    category_confidence: float
+    subcategory_confidence: float
 
 
 

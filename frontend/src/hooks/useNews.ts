@@ -22,13 +22,17 @@ interface UseNewsActions {
   updateUserCategories: (data: UpdateCategoriesUsers) => Promise<void>;
   getUserCategories: () => Promise<void>;
   createCustomCategory: (data: CreateCategoryData) => Promise<void>;
-  addSubcategoriesToCategory: (data: AddSubcategoriesToCategorySchema) => Promise<void>;
+  addSubcategoriesToCategory: (
+    data: AddSubcategoriesToCategorySchema,
+  ) => Promise<void>;
   getTodayNews: () => Promise<void>;
   clearError: () => void;
 }
 
 export function useNews(): UseNewsState & UseNewsActions {
-  const [categories, setCategories] = useState<ResponseCategoryData[] | null>(null);
+  const [categories, setCategories] = useState<ResponseCategoryData[] | null>(
+    null,
+  );
   const [news, setNews] = useState<TodayNewsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiErrorDetails | null>(null);
@@ -57,21 +61,24 @@ export function useNews(): UseNewsState & UseNewsActions {
     }
   }, []);
 
-  const updateUserCategories = useCallback(async (data: UpdateCategoriesUsers) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await newsService.updateUserCategories(data);
-      if (response.data) {
-        setCategories(response.data);
+  const updateUserCategories = useCallback(
+    async (data: UpdateCategoriesUsers) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await newsService.updateUserCategories(data);
+        if (response.data) {
+          setCategories(response.data);
+        }
+      } catch (err: any) {
+        handleError(err);
+        throw err;
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      handleError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const getUserCategories = useCallback(async () => {
     setLoading(true);
@@ -121,7 +128,7 @@ export function useNews(): UseNewsState & UseNewsActions {
         setLoading(false);
       }
     },
-    []
+    [],
   );
 
   const getTodayNews = useCallback(async () => {

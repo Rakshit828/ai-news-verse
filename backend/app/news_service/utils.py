@@ -12,11 +12,12 @@ You are an AI assistant for classifying AI news.
 
 Task:
 Given a news **TITLE**, return the closest matching **category** and **subcategory** from **CATEGORY_DATA**.
+Also you have to give score for your classification.
 
 Rules:
 
 1. Use only entries from **CATEGORY_DATA**.
-2. Output **strict JSON only**, following the structure below.
+2. Output **strict JSON only**, following the structure below. Do not even include the markdown json format. Give just json.
 3. No explanations or extra text.
 4. If multiple matches exist, choose the single closest match.
 
@@ -28,6 +29,8 @@ Output (exact structure):
 {{
 "category": {{ "category_id": "sectors", "title": "Sector-Specific" }},
 "subcategory": {{ "subcategory_id": "ai-healthcare", "title": "Healthcare" }}
+"category_confidence": 0.98
+"subcategory_confidence": 0.88
 }}
 
 """
@@ -45,7 +48,7 @@ async def classify_category(category_data: dict, news_title: str) -> ClassifiedC
                 "content": prompt,
             }
         ],
-        model="openai/gpt-oss-120b", # llama-3.3-70b-versatile
+        model="openai/gpt-oss-20b", # llama-3.3-70b-versatile,
     )
 
     try:

@@ -35,11 +35,8 @@ A sophisticated AI-powered news aggregation platform that delivers personalized,
 ### Core Features
 - **🔐 Cookie-Based JWT Authentication** - Secure session management with httpOnly cookies, no token storage needed
 - **📰 Multi-Source News Aggregation** - Curated content from 10+ premium AI news sources (Google News, Anthropic, OpenAI)
-- **🎯 Personalized Feed** - Machine learning-powered recommendations based on user interests
-- **🔔 Real-Time Updates** - Live monitoring of emerging AI trends and breaking news
 - **🏷️ Category Management** - Customize your news preferences with flexible category selection
-- **⚡ Lightning-Fast Search** - Indexed database queries for instant results
-- **📊 Advanced Analytics** - Track trends and analyze market movements
+
 
 ### Technical Features
 - **Async-First Architecture** - Non-blocking I/O for high throughput

@@ -9,8 +9,7 @@ import { FilterBar } from '../components/FilterBar';
 import { useNews } from '../hooks/useNews';
 import { Card, CardContent } from '../components/ui/card';
 import { useCategory } from '../context/CategoryContext';
-
-
+import type { BaseArticleResponse } from '../types/api.types';
 
 // Map source names to colors and icons
 const sourceConfig = {
@@ -31,15 +30,12 @@ const sourceConfig = {
   },
 };
 
-interface NewsArticle {
-  title: string;
-  url: string;
-  description: string;
+interface NewsArticleWithSource extends BaseArticleResponse {
   news_from: 'Google News' | 'Anthropic' | 'Openai';
 }
 
 interface GroupedNews {
-  [key: string]: NewsArticle[];
+  [key: string]: NewsArticleWithSource[];
 }
 
 const filters = [
@@ -68,7 +64,7 @@ export const Dashboard: React.FC = () => {
   const allArticles = useMemo(() => {
     if (!news) return [];
 
-    const articles: NewsArticle[] = [];
+    const articles: NewsArticleWithSource[] = [];
 
     // Combine all news from different sources
     if (news.google && Array.isArray(news.google)) {
@@ -212,7 +208,7 @@ export const Dashboard: React.FC = () => {
               <Card className="bg-yellow-900/20 border-yellow-700/50">
                 <CardContent className="pt-6">
                   <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-yellow-300 font-semibold">
                         Note: Could not fetch news
@@ -293,8 +289,8 @@ export const Dashboard: React.FC = () => {
                             title: article.title,
                             url: article.url,
                             description: article.description,
-                            category: source,
-                            subcategory: source,
+                            category: article.category_id || 'Uncategorized',
+                            subcategory: article.subcategory_id || 'General',
                           }))}
                           onRemove={(id) => {
                             const article = articles[id];

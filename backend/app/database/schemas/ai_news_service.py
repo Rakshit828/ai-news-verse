@@ -55,6 +55,8 @@ class BaseArticleResponse(BaseModel):
     title: str
     url: str
     description: str
+    category_id: str | None
+    subcategory_id: str | None
 
 
 

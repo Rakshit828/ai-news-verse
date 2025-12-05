@@ -96,7 +96,11 @@ class GoogleService(BaseNewsService):
         return GoogleArticle(
             **scraped_article.model_dump(),
             category=category_classified.category,
-            sub_category=category_classified.subcategory,
+            sub_category=(
+                category_classified.subcategory
+                if category_classified.subcategory_confidence >= 0.5
+                else None
+            ),
         )
 
     async def scrape_and_classify(

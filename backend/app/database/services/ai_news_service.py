@@ -42,7 +42,7 @@ from app.news_service.exceptions import (
 async def prepare_article(articles):
     result_articles = []
     for row in articles:
-        result_articles.append({"title": row[0], "url": row[1], "description": row[2]})
+        result_articles.append({"title": row[0], "url": row[1], "description": row[2], "category_id": row[3], "subcategory_id": row[4]})
     return result_articles
 
 
@@ -66,11 +66,11 @@ class AiNewsService:
         ) as f:
             categories_data = json.load(f)["categories"]
             for category in categories_data:
-                cat = Category(id=category["id"], title=category["title"])
+                cat = Category(category_id=category["id"], title=category["title"])
                 session.add(cat)
                 for sub_category in category["subcategories"]:
                     sub_cat = SubCategory(
-                        id=sub_category["subcategory_id"],
+                        subcategory_id=sub_category["id"],
                         category_id=cat.category_id,
                         title=sub_category["title"],
                     )
@@ -588,7 +588,7 @@ class AiNewsService:
         )
 
         statement_google = select(
-            GoogleArticles.title, GoogleArticles.url, GoogleArticles.description
+            GoogleArticles.title, GoogleArticles.url, GoogleArticles.description, GoogleArticles.category_id, GoogleArticles.subcategory_id
         ).where(
             GoogleArticles.published_on >= today,
             GoogleArticles.subcategory_id.in_(user_subcategories),
@@ -597,12 +597,14 @@ class AiNewsService:
             AnthropicArticles.title,
             AnthropicArticles.url,
             AnthropicArticles.description,
+            AnthropicArticles.category_id,
+            AnthropicArticles.subcategory_id
         ).where(
             AnthropicArticles.published_on >= today,
             AnthropicArticles.subcategory_id.in_(user_subcategories),
         )
         statement_openai = select(
-            OpenAiArticles.title, OpenAiArticles.url, OpenAiArticles.description
+            OpenAiArticles.title, OpenAiArticles.url, OpenAiArticles.description, OpenAiArticles.category_id, OpenAiArticles.subcategory_id
         ).where(
             OpenAiArticles.published_on >= today,
             OpenAiArticles.subcategory_id.in_(user_subcategories),

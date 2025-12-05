@@ -109,6 +109,8 @@ export interface BaseArticleResponse {
   title: string;
   url: string;
   description: string;
+  category_id: string | null;
+  subcategory_id: string | null;
 }
 
 export interface GoogleNewsResponse extends BaseArticleResponse {

@@ -13,56 +13,61 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { SelectionSummary } from '../components/SelectionSummary';
 import { StatusBanner } from '../components/StatusBanner';
 import { CategoryCard } from '../components/CategoryCard';
-
-
-
 const categoriesData: CategoriesData = {
   categories: [
     {
-      category_id: 'core',
+      category_id: 'core-ai-news',
       title: 'Core AI News',
       subcategories: [
-        { subcategory_id: 'ai-industry', title: 'Industry News' },
-        { subcategory_id: 'ai-research', title: 'Research' },
-        { subcategory_id: 'ai-policy', title: 'Policy & Regulation' },
-        { subcategory_id: 'ai-saftey', title: 'AI Safety' },
-        { subcategory_id: 'ai-product-launches', title: 'Recent AI products' },
+        { subcategory_id: 'ai-industry', title: 'AI Industry' },
+        { subcategory_id: 'ai-research', title: 'AI Research' },
+        {
+          subcategory_id: 'ai-policy-regulation',
+          title: 'AI Policy & Regulation',
+        },
+        { subcategory_id: 'ai-threats', title: 'AI Threats' },
+        {
+          subcategory_id: 'ai-product-launches',
+          title: 'AI New Product Releases',
+        },
       ],
     },
     {
-      category_id: 'technical',
-      title: 'Technical Part of AI',
+      category_id: 'technical-ai',
+      title: 'Technical AI',
       subcategories: [
-        { subcategory_id: 'llm', title: 'LLMs' },
-        { subcategory_id: 'cv', title: 'Computer Vision' },
-        { subcategory_id: 'genai', title: 'Generative AI' },
+        { subcategory_id: 'llms', title: 'LLMs' },
+        { subcategory_id: 'computer-vision', title: 'Computer Vision' },
+        { subcategory_id: 'agentic-ai', title: 'Agentic AI' },
+        { subcategory_id: 'generative-ai', title: 'Generative AI' },
+        { subcategory_id: 'robotics', title: 'Robotics & Control' },
+        {
+          subcategory_id: 'ai-optimization-algorithms',
+          title: 'AI Optimization/Algorithms',
+        },
       ],
     },
     {
-      category_id: 'general_user_usecases',
-      title: 'AI Tools for General Users',
+      category_id: 'developer-tools',
+      title: 'Developer Tools',
       subcategories: [
-        { subcategory_id: 'ai-writing', title: 'Writing Tools' },
-        { subcategory_id: 'ai-productivity', title: 'Productivity' },
-        { subcategory_id: 'ai-media-tools', title: 'Image/Video/Audio Tools' },
-      ],
-    },
-    {
-      category_id: 'developer_usecases',
-      title: 'AI Tools for Developers',
-      subcategories: [
-        { subcategory_id: 'ai-coding', title: 'Code Generation' },
+        { subcategory_id: 'code-generation', title: 'AI Code Generation' },
         { subcategory_id: 'mlops', title: 'MLOps' },
-        { subcategory_id: 'infra', title: 'Infrastructure' },
+        { subcategory_id: 'ai-infrastructure', title: 'AI Infrastructure' },
+        {
+          subcategory_id: 'ai-evaluation-testing',
+          title: 'AI Model Evaluation & Testing',
+        },
       ],
     },
     {
       category_id: 'sectors',
-      title: 'Sector-Specific',
+      title: 'Sectors',
       subcategories: [
-        { subcategory_id: 'ai-healthcare', title: 'Healthcare' },
-        { subcategory_id: 'ai-finance', title: 'Finance' },
-        { subcategory_id: 'ai-education', title: 'Education' },
+        { subcategory_id: 'ai-healthcare', title: 'AI Healthcare' },
+        { subcategory_id: 'ai-finance', title: 'AI Finance' },
+        { subcategory_id: 'ai-education', title: 'AI-Education' },
+        { subcategory_id: 'ai-entertainment', title: 'AI-Entertainment' },
       ],
     },
   ],
@@ -74,7 +79,7 @@ export default function CategoriesPage() {
     [],
   );
   const [expandedCategories, setExpandedCategories] = useState<string[]>([
-    'core',
+    'core-ai-news',
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);

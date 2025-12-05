@@ -1,50 +1,46 @@
 {
   "categories": [
     {
-      "id": "core",
+      "id": "core-ai-news",
       "title": "Core AI News",
       "subcategories": [
-        { "id": "ai-industry", "title": "Industry News" },
-        { "id": "ai-research", "title": "Research" },
-        { "id": "ai-policy", "title": "Policy & Regulation" },
-        { "id": "ai-saftey", "title": "AI Saftey" },
-        { "id": "ai-product-launches", "title": "Recent AI products"}
+        { "id": "ai-industry", "title": "AI Industry" },
+        { "id": "ai-research", "title": "AI Research" },
+        { "id": "ai-policy-regulation", "title": "AI Policy & Regulation" },
+        { "id": "ai-threats", "title": "AI Threats" },
+        { "id": "ai-product-launches", "title": "AI New Product Releases" }
       ]
     },
     {
-      "id": "technical",
-      "title": "Technical Part of AI",
+      "id": "technical-ai",
+      "title": "Technical AI",
       "subcategories": [
-        { "id": "llm", "title": "LLMs" },
-        { "id": "cv", "title": "Computer Vision" },
-        { "id": "genai", "title": "Generative AI" }
+        { "id": "llms", "title": "LLMs" },
+        { "id": "computer-vision", "title": "Computer Vision" },
+        { "id": "agentic-ai", "title": "Agentic AI"},
+        { "id": "generative-ai", "title": "Generative AI" },
+        { "id": "robotics", "title": "Robotics & Control" },
+        { "id": "ai-optimization-algorithms", "title": "AI Optimization/Algorithms" }
       ]
     },
     {
-      "id": "general_user_usecases",
-      "title": "AI Tools for General Users",
+      "id": "developer-tools",
+      "title": "Developer Tools",
       "subcategories": [
-        { "id": "ai-writing", "title": "Writing Tools" },
-        { "id": "ai-productivity", "title": "Productivity" },
-        { "id": "ai-media-tools", "title": "Image/Video/Audio Tools" }
-      ]
-    },
-    {
-      "id": "developer_usecases",
-      "title": "AI Tools for Developers",
-      "subcategories": [
-        { "id": "ai-coding", "title": "Code Generation" },
+        { "id": "code-generation", "title": "AI Code Generation" },
         { "id": "mlops", "title": "MLOps" },
-        { "id": "infra", "title": "Infrastructure" }
+        { "id": "ai-infrastructure", "title": "AI Infrastructure" },
+        { "id": "ai-evaluation-testing", "title": "AI Model Evaluation & Testing" }
       ]
     },
     {
       "id": "sectors",
-      "title": "Sector-Specific",
+      "title": "Sectors",
       "subcategories": [
-        { "id": "ai-healthcare", "title": "Healthcare" },
-        { "id": "ai-finance", "title": "Finance" },
-        { "id": "ai-education", "title": "Education" }
+        { "id": "ai-healthcare", "title": "AI Healthcare" },
+        { "id": "ai-finance", "title": "AI Finance" },
+        { "id": "ai-education", "title": "AI-Education" },
+        { "id": "ai-entertainment", "title": "AI-Entertainment" }
       ]
     }
   ]

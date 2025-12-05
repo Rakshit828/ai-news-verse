@@ -135,3 +135,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Global scrollbar styles for news description and other scroll areas */
+.news-card-desc::-webkit-scrollbar { width: 8px; height: 8px; }
+.news-card-desc::-webkit-scrollbar-thumb {
+  background: rgba(100,116,139,0.6);
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0);
+  background-clip: padding-box;
+}
+.news-card-desc::-webkit-scrollbar-track { background: transparent; }
+/* Firefox */
+.news-card-desc { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,0.6) transparent; }
+
+/* Prevent horizontal scrollbars globally inside cards */
+.no-h-scroll { overflow-x: hidden; }
