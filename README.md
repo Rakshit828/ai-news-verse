@@ -38,14 +38,6 @@ A sophisticated AI-powered news aggregation platform that delivers personalized,
 - **🏷️ Category Management** - Customize your news preferences with flexible category selection
 
 
-### Technical Features
-- **Async-First Architecture** - Non-blocking I/O for high throughput
-- **Intelligent Caching** - Redis-based caching for optimal performance
-- **Type-Safe Frontend** - Full TypeScript support with strict typing
-- **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
-- **Modern UI/UX** - Beautiful dark-themed interface with smooth animations
-- **Error Handling** - Comprehensive error management and user feedback
-
 ---
 
 ## 🏗️ Architecture

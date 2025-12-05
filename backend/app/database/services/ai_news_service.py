@@ -5,7 +5,7 @@ from typing import Sequence, List, Type, Literal
 import json
 import asyncio
 from datetime import datetime, timezone, time
-
+import time as t
 
 from app.database.models.ai_news_service import (
     AnthropicArticles,
@@ -635,6 +635,7 @@ class AiNewsService:
             HackernoonArticles.subcategory_id.in_(user_subcategories),
         )
 
+        start = t.time()
         google_articles, anthropic_articles, openai_articles, hackernoon_articles = (
             await asyncio.gather(
                 self.fetch_from_db(statement_google, session=session, to="rows"),
@@ -643,6 +644,7 @@ class AiNewsService:
                 self.fetch_from_db(statement_hackernoon, session=session, to="rows"),
             )
         )
+        print("Fetched in : ", t.time() - start )
 
         (
             response_google_articles,
@@ -655,6 +657,8 @@ class AiNewsService:
             prepare_article(openai_articles),
             prepare_article(hackernoon_articles),
         )
+
+
         today_news_response = TodayNewsResponse(
             google=response_google_articles,
             anthropic=response_anthropic_articles,
