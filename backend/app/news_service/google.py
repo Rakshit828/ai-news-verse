@@ -45,8 +45,8 @@ class GoogleService(BaseNewsService):
     async def _construct_rss_urls(cls) -> List[str]:
         """Returns the list of rss urls with categories from database."""
         async for session in get_session():
-            sub_cat_ids: List[str] = await cls.DB_SERVICE.get_all_subcategories_id(
-                session=session
+            sub_cat_ids: List[str] = await cls.DB_SERVICE.get_subcategory_column(
+                column="subcategory_id", session=session
             )
             rss_urls = [
                 cls.BASE_URL.format(sub_category_query=sub_cat_id)
@@ -109,7 +109,7 @@ class GoogleService(BaseNewsService):
             google_article: GoogleArticle = await self.transform_to_classified_article(
                 scraped_article=scraped_article, session=session
             )
-            return google_article 
+            return google_article
         return None
 
     async def transform_to_classified_articles(
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
         async for session in get_session():
             await google.fetch_and_save_articles(
-                session=session, cutoff_hours=2, commit_on_each=True
+                session=session, cutoff_hours=24, commit_on_each=True
             )
 
     asyncio.run(main())

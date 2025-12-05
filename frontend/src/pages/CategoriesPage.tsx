@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
-import { useNews } from '../hooks/useNews';
+import { useCategory } from '../context/CategoryContext';
 import type {
   CategoriesData,
   SetCategoriesUsers,
@@ -13,6 +13,8 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { SelectionSummary } from '../components/SelectionSummary';
 import { StatusBanner } from '../components/StatusBanner';
 import { CategoryCard } from '../components/CategoryCard';
+
+
 
 const categoriesData: CategoriesData = {
   categories: [
@@ -67,71 +69,53 @@ const categoriesData: CategoriesData = {
 };
 
 export default function CategoriesPage() {
-  // Local state
+  // Local UI state
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(
     [],
   );
   const [expandedCategories, setExpandedCategories] = useState<string[]>([
     'core',
   ]);
-  const [hasExistingCategories, setHasExistingCategories] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // API hooks
+  // Get categories from context
   const {
     categories: userCategories,
-    getUserCategories,
-    setUserCategories,
-    updateUserCategories,
+    setCategories,
+    updateCategories,
     loading,
     error,
-  } = useNews();
+    clearError: contextClearError,
+  } = useCategory();
+
   const { showToast } = useToast();
 
-  // ========================================================================
-  // Initialize - Load existing categories on mount
-  // ========================================================================
-  useEffect(() => {
-    const initializeCategories = async () => {
-      try {
-        await getUserCategories();
-      } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to load categories';
-        setLocalError(errorMsg);
-        console.error('Failed to initialize categories:', err);
+  // Determine if we have existing categories
+  const hasExistingCategories = userCategories && userCategories.length > 0;
+
+  // Process user categories from context to pre-fill selections
+  const processedCategories = useMemo(() => {
+    if (!userCategories || userCategories.length === 0) return [];
+
+    const allSelectedSubcategories: string[] = [];
+    userCategories.forEach((category) => {
+      if (category.subcategories && category.subcategories.length > 0) {
+        category.subcategories.forEach((subcategory) => {
+          allSelectedSubcategories.push(subcategory.subcategory_id);
+        });
       }
-    };
+    });
 
-    initializeCategories();
-  }, []);
-
-  // ========================================================================
-  // Process user categories from API response
-  // ========================================================================
-  useEffect(() => {
-    if (userCategories && userCategories.length > 0) {
-      // Extract selected subcategories from API response
-      const allSelectedSubcategories: string[] = [];
-
-      userCategories.forEach((category) => {
-        if (category.subcategories && category.subcategories.length > 0) {
-          category.subcategories.forEach((subcategory) => {
-            allSelectedSubcategories.push(subcategory.subcategory_id);
-          });
-        }
-      });
-
-      if (allSelectedSubcategories.length > 0) {
-        setSelectedSubcategories(allSelectedSubcategories);
-        setHasExistingCategories(true);
-      } else {
-        setHasExistingCategories(false);
-      }
-    } else {
-      setHasExistingCategories(false);
-    }
+    return allSelectedSubcategories;
   }, [userCategories]);
+
+  // Auto-populate selections when user categories are loaded
+  useMemo(() => {
+    if (processedCategories.length > 0 && selectedSubcategories.length === 0) {
+      setSelectedSubcategories(processedCategories);
+    }
+  }, [processedCategories]);
 
   // ========================================================================
   // Helper function to find category for a subcategory
@@ -213,9 +197,8 @@ export default function CategoriesPage() {
     setLocalError(null);
 
     try {
-      await setUserCategories(formattedData);
+      await setCategories(formattedData);
       showToast('Categories set successfully!', 'success');
-      setHasExistingCategories(true);
     } catch (err: any) {
       const errorMsg = err?.message || 'Failed to set categories';
       setLocalError(errorMsg);
@@ -239,7 +222,7 @@ export default function CategoriesPage() {
     setLocalError(null);
 
     try {
-      await updateUserCategories(formattedData);
+      await updateCategories(formattedData);
       showToast('Categories updated successfully!', 'success');
     } catch (err: any) {
       const errorMsg = err?.message || 'Failed to update categories';
@@ -286,13 +269,16 @@ export default function CategoriesPage() {
 
         {/* Error Alert */}
         <ErrorAlert
-          error={localError || error?.message || null}
-          onDismiss={() => setLocalError(null)}
+          error={localError || error}
+          onDismiss={() => {
+            setLocalError(null);
+            contextClearError();
+          }}
         />
 
         {/* Status Banner - Shows if categories exist or not */}
         {!loading && (
-          <StatusBanner hasExistingCategories={hasExistingCategories} />
+          <StatusBanner hasExistingCategories={!!hasExistingCategories} />
         )}
 
         {/* Selection Summary */}
@@ -371,40 +357,46 @@ export default function CategoriesPage() {
         )}
 
         {/* Empty State - No categories selected and not initialized */}
-        {!loading && !hasExistingCategories && selectedSubcategories.length === 0 && (
-          <Card className="bg-slate-700 border-slate-600 text-center py-12 shadow-lg">
-            <CardContent>
-              <p className="text-slate-300 mb-4">
-                No categories selected yet. Start by selecting topics above to begin receiving personalized AI news.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => handleCategoryExpand('core')}
-                className="bg-slate-600 border-slate-500 text-slate-100 hover:bg-slate-500 hover:text-white"
-              >
-                Select Your First Category
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {!loading &&
+          !hasExistingCategories &&
+          selectedSubcategories.length === 0 && (
+            <Card className="bg-slate-700 border-slate-600 text-center py-12 shadow-lg">
+              <CardContent>
+                <p className="text-slate-300 mb-4">
+                  No categories selected yet. Start by selecting topics above to
+                  begin receiving personalized AI news.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => handleCategoryExpand('core')}
+                  className="bg-slate-600 border-slate-500 text-slate-100 hover:bg-slate-500 hover:text-white"
+                >
+                  Select Your First Category
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
         {/* State when categories exist but none are currently selected */}
-        {!loading && hasExistingCategories && selectedSubcategories.length === 0 && (
-          <Card className="bg-slate-700 border-slate-600 text-center py-12 shadow-lg">
-            <CardContent>
-              <p className="text-slate-300 mb-4">
-                You can modify your category selection below. Your current categories will remain active until you save changes.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => handleCategoryExpand('core')}
-                className="bg-slate-600 border-slate-500 text-slate-100 hover:bg-slate-500 hover:text-white"
-              >
-                View Categories
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {!loading &&
+          hasExistingCategories &&
+          selectedSubcategories.length === 0 && (
+            <Card className="bg-slate-700 border-slate-600 text-center py-12 shadow-lg">
+              <CardContent>
+                <p className="text-slate-300 mb-4">
+                  You can modify your category selection below. Your current
+                  categories will remain active until you save changes.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => handleCategoryExpand('core')}
+                  className="bg-slate-600 border-slate-500 text-slate-100 hover:bg-slate-500 hover:text-white"
+                >
+                  View Categories
+                </Button>
+              </CardContent>
+            </Card>
+          )}
       </div>
     </div>
   );

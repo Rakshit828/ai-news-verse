@@ -1,3 +1,5 @@
+// authService.ts - UPDATE THIS
+
 import { apiClient } from './apiClient';
 import {
   SuccessResponse,
@@ -27,11 +29,11 @@ class AuthService {
    *   - email: string
    *   - password: string
    *
-   * Response: null
+   * Response: UserResponseSchema (FIXED - was null before)
    * Side effect: Sets httpOnly cookies with access_token and refresh_token
    */
-  async login(userData: UserLogInSchema): Promise<SuccessResponse<null>> {
-    return apiClient.post<null>('/auth/login', userData);
+  async login(userData: UserLogInSchema): Promise<SuccessResponse<UserResponseSchema>> {
+    return apiClient.post<UserResponseSchema>('/auth/login', userData);
   }
 
   /**

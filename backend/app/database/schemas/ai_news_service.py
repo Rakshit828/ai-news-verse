@@ -57,6 +57,7 @@ class BaseArticleResponse(BaseModel):
     description: str
 
 
+
 class GoogleNewsResponse(BaseArticleResponse):
     news_from: str = 'Google News'
 

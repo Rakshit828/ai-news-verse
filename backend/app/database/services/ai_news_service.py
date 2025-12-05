@@ -76,6 +76,8 @@ class AiNewsService:
                     )
                     session.add(sub_cat)
             await session.commit()
+    
+
 
     async def get_categories_data(self, session: AsyncSession) -> CategoriesData:
         """Returs the full category and subcategory data from the table except custom ones."""

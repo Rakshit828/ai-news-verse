@@ -101,6 +101,6 @@ if __name__ == "__main__":
     async def main():
         openai = OpenAiService.create()
         async for session in get_session():
-            await openai.fetch_and_save_articles(session=session, cutoff_hours=100, commit_on_each=True)
+            await openai.fetch_and_save_articles(session=session, cutoff_hours=48, commit_on_each=True)
 
     asyncio.run(main())

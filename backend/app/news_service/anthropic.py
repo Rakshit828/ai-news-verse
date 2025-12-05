@@ -102,6 +102,6 @@ if __name__ == "__main__":
         anthropic = AnthropicService.create()
 
         async for session in get_session():
-            await anthropic.fetch_and_save_articles(session=session, cutoff_hours=1000, commit_on_each=True)
+            await anthropic.fetch_and_save_articles(session=session, cutoff_hours=48, commit_on_each=True)
 
     asyncio.run(main())

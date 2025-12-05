@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+// AuthContext.tsx - UPDATE THIS
+
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authService } from '../services/authService';
 import {
   UserResponseSchema,
@@ -21,12 +23,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponseSchema | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with true for initial check
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  // Check if user has valid session on mount
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Try to fetch news or categories to verify session is valid
+        // If this succeeds, user has a valid token cookie
+        const response = await fetch('http://localhost:8000/api/v1/news/get/my-categories', {
+          method: 'GET',
+          credentials: 'include', // Include cookies
+        });
+
+        if (response.ok) {
+          // User has valid session, set authenticated
+          setIsAuthenticated(true);
+          // Could also fetch user data here if you have a /me endpoint
+        } else if (response.status === 401) {
+          // No valid session
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        console.log('Session check failed, user not authenticated');
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSession();
   }, []);
 
   const signup = useCallback(async (data: UserCreateSchema) => {
@@ -72,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       const errorMessage = err.message || 'Logout failed';
       setError(errorMessage);
-      // Still logout locally even if backend call fails
       setUser(null);
       setIsAuthenticated(false);
     } finally {

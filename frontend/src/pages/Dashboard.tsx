@@ -8,6 +8,9 @@ import { StatsCard } from '../components/StatsCard';
 import { FilterBar } from '../components/FilterBar';
 import { useNews } from '../hooks/useNews';
 import { Card, CardContent } from '../components/ui/card';
+import { useCategory } from '../context/CategoryContext';
+
+
 
 // Map source names to colors and icons
 const sourceConfig = {
@@ -47,7 +50,15 @@ const filters = [
 ];
 
 export const Dashboard: React.FC = () => {
-  const { news, loading, error, categories, getTodayNews } = useNews();
+  const {
+    news,
+    loading: newsLoading,
+    error: newsError,
+    getTodayNews,
+  } = useNews();
+
+  // Get categories from context (already fetched automatically)
+  const { categories } = useCategory();
   const [activeFilter, setActiveFilter] = useState('all');
   const [removedArticles, setRemovedArticles] = useState<Set<string>>(
     new Set(),
@@ -124,7 +135,7 @@ export const Dashboard: React.FC = () => {
     }
 
     // If error occurred while fetching news, show "error"
-    if (error) {
+    if (newsError) {
       return 'error';
     }
 
@@ -178,7 +189,7 @@ export const Dashboard: React.FC = () => {
           </motion.div>
 
           {/* Loading State */}
-          {loading && (
+          {newsLoading && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -192,7 +203,7 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Error Banner (separate from empty state) */}
-          {!loading && error && allArticles.length === 0 && (
+          {!newsLoading && newsError && allArticles.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -207,7 +218,7 @@ export const Dashboard: React.FC = () => {
                         Note: Could not fetch news
                       </p>
                       <p className="text-yellow-400/80 text-sm mt-1">
-                        {error.message}
+                        {newsError.message}
                       </p>
                     </div>
                   </div>
@@ -217,7 +228,7 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Stats Grid - Only show when there are articles */}
-          {!loading && allArticles.length > 0 && (
+          {!newsLoading && allArticles.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -238,7 +249,7 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Filter Bar - Only show when there are articles */}
-          {!loading && allArticles.length > 0 && (
+          {!newsLoading && allArticles.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -259,11 +270,8 @@ export const Dashboard: React.FC = () => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            {!loading && allArticles.length === 0 ? (
-              <EmptyState
-                type={getEmptyStateType()}
-                onRetry={getTodayNews}
-              />
+            {!newsLoading && allArticles.length === 0 ? (
+              <EmptyState type={getEmptyStateType()} onRetry={getTodayNews} />
             ) : (
               <div>
                 {Object.entries(groupedNews).map(
@@ -289,7 +297,6 @@ export const Dashboard: React.FC = () => {
                             subcategory: source,
                           }))}
                           onRemove={(id) => {
-                            // Get the article URL from the articles array using the id
                             const article = articles[id];
                             if (article && article.url) {
                               handleRemoveArticle(article.url);
