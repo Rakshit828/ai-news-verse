@@ -36,9 +36,14 @@ A sophisticated AI-powered news aggregation platform that delivers personalized,
 - **🔐 Cookie-Based JWT Authentication** - Secure session management with httpOnly cookies, no token storage needed
 - **📰 Multi-Source News Aggregation** - Curated content from 10+ premium AI news sources (Google News, Anthropic, OpenAI)
 - **🏷️ Category Management** - Customize your news preferences with flexible category selection
-
+- ** Information about various blog posts on AI ** - The application not only provides news but also
+the blog post / articles and opinions on AI.
 
 ---
+
+### On Development
+- **Real time notification for users**
+- **Using background processes to periodically fetch the latest articles.**
 
 ## 🏗️ Architecture
 
@@ -659,59 +664,7 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 
 ---
 
-## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+**Built with ❤️ by Rakshit Paudyal**
 
----
-
-## 🙋 Support & Contact
-
-For questions, issues, or suggestions:
-
-- **Issues** - Open an issue on GitHub
-- **Email** - contact@ainewsverse.com
-- **Twitter** - [@AINewsVerse](https://twitter.com)
-
----
-
-## 🎯 Roadmap
-
-- [ ] Mobile app (React Native)
-- [ ] Advanced ML recommendations
-- [ ] Social sharing features
-- [ ] Email digest subscriptions
-- [ ] Browser extension
-- [ ] Dark mode toggle
-- [ ] Multi-language support
-- [ ] Advanced search with filters
-- [ ] User activity analytics
-- [ ] Export to PDF/CSV
-
----
-
-## 📊 Performance Metrics
-
-- **Frontend Load Time** - < 2 seconds
-- **API Response Time** - < 500ms
-- **Database Query Time** - < 100ms
-- **Cache Hit Rate** - > 80%
-- **Uptime** - 99.9%
-
----
-
-## 🔄 Updates & Changelog
-
-### v1.0.0 (Current)
-- ✅ Core authentication system
-- ✅ Multi-source news aggregation
-- ✅ Category management
-- ✅ Personalized feed
-- ✅ Beautiful UI with animations
-- ✅ Cookie-based JWT auth
-
----
-
-**Built with ❤️ by the AI NewsVerse Team**
-
-*Last Updated: December 5, 2025*
+*Last Updated: December 7, 2025*

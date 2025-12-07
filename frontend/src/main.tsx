@@ -6,12 +6,18 @@ import { ToastProvider } from './context/ToastContext.tsx';
 import { AuthProvider } from './context/AuthContext.tsx';
 import { CategoryProvider } from './context/CategoryContext.tsx';
 
+import { Toaster } from 'sonner';
+import { NotificationProvider } from './context/NotificationContext.tsx';
+
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
     <ToastProvider>
       <AuthProvider>
         <CategoryProvider>
-          <App />
+          <NotificationProvider>
+            <App />
+            <Toaster position="top-right" richColors />
+          </NotificationProvider>
         </CategoryProvider>
       </AuthProvider>
     </ToastProvider>

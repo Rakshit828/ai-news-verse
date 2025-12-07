@@ -10,6 +10,10 @@ import { useNews } from '../hooks/useNews';
 import { Card, CardContent } from '../components/ui/card';
 import { useCategory } from '../context/CategoryContext';
 import type { BaseArticleResponse } from '../types/api.types';
+import { useNotification } from '../context/NotificationContext';
+
+
+
 
 // Map source names to colors and icons
 const sourceConfig = {
@@ -51,7 +55,9 @@ const filters = [
   { label: 'Hackernoon', value: 'Hackernoon' },
 ];
 
+
 export const Dashboard: React.FC = () => {
+  const { connected } = useNotification();
   const {
     news,
     loading: newsLoading,
@@ -171,8 +177,8 @@ export const Dashboard: React.FC = () => {
     {
       icon: <Zap className="h-5 w-5" />,
       label: 'Live Updates',
-      value: 'Deactive',
-      color: 'amber' as const,
+      value: connected ? 'Active' : 'Deactive',
+      color: (connected ? 'emerald' : 'amber') as 'emerald' | 'amber',
     },
   ];
 
@@ -238,8 +244,8 @@ export const Dashboard: React.FC = () => {
             </motion.div>
           )}
 
-          {/* Stats Grid - Only show when there are articles */}
-          {!newsLoading && allArticles.length > 0 && (
+          {/* Stats Grid - Always show when not loading */}
+          {!newsLoading && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Zap, Settings, LogOut, Sliders, Menu, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -10,10 +11,12 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Button } from './ui/button';
+import { useNotification } from '../context/NotificationContext';
 
 export const FloatingNavBar: React.FC = () => {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { connected } = useNotification();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -56,6 +59,8 @@ export const FloatingNavBar: React.FC = () => {
               <h1 className="text-lg font-bold tracking-tight bg-linear-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent hidden sm:inline-block group-hover:from-blue-300 group-hover:to-cyan-300 transition-all">
                 AiNewsVerse
               </h1>
+               {/* Connection Status Indicator */}
+              <div className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500'} transition-colors ml-2`} title={connected ? "Live Updates Active" : "Connecting..."} />
             </div>
 
             {/* Desktop Navigation */}
