@@ -38,33 +38,33 @@ class BaseArticle(BaseModel):
         extra='ignore'
     )
 
-class ScrapedArticle(BaseArticle):
-    markdown_content: str = Field(description="The markdown content from the article's url.")
 
-
-
-class GoogleArticle(ScrapedArticle):
+class GoogleArticle(BaseArticle):
     article_from: str = 'GOOGLE_NEWS'
-    category: Category  | None = None
+    category: Category 
     sub_category: SubCategory | None = None
+    markdown_content: str | None = None
 
 
-class AnthropicArticle(ScrapedArticle):
+class AnthropicArticle(BaseArticle):
     article_from: str = 'ANTHROPIC'
-    category: Category  
+    category: Category 
     sub_category: SubCategory | None = None
+    markdown_content: str | None = None
 
 
-class OpenAiArticle(ScrapedArticle):
+class OpenAiArticle(BaseArticle):
     article_from: str = 'OPENAI'
-    category: Category  
+    category: Category 
     sub_category: SubCategory | None = None
+    markdown_content: str | None = None
 
 
-class HackernoonArticle(ScrapedArticle):
+class HackernoonArticle(BaseArticle):
     article_from: str = 'HACKERNOON'
-    category: Category  
+    category: Category 
     sub_category: SubCategory | None = None
+    markdown_content: str | None = None
 
 
-ClassifiedArticle: TypeAlias = GoogleArticle | AnthropicArticle | OpenAiArticle | HackernoonArticle
+ServiceArticle: TypeAlias = GoogleArticle | AnthropicArticle | OpenAiArticle | HackernoonArticle

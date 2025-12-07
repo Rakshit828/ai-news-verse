@@ -1,16 +1,10 @@
 import asyncio
-from typing import List, Dict
+from typing import Dict
 from datetime import datetime, timezone
 from app.config import CONFIG
-from app.news_service.types import (
-    ScrapedArticle,
-    OpenAiArticle,
-    ClassifiedCategory,
-    CategoriesData,
-)
+from app.news_service.types import OpenAiArticle, ClassifiedCategory
 from app.news_service._base import BaseNewsService
-from app.news_service.utils import classify_category
-from app.news_service.scrapers._scraper import Scraper
+from app.news_service.components.scraper import Scraper
 
 from app.database.models.ai_news_service import (
     OpenAiArticles as OpenAiArticleORM,
@@ -27,10 +21,11 @@ class OpenAiService(BaseNewsService):
     def __init__(self, scraper: Scraper):
         if not isinstance(scraper, Scraper):
             raise InvalidScraper()
+        super().__init__()
         self.scraper = scraper
 
     @classmethod
-    def create(cls):
+    async def create(cls):
         """Factory method to create Anthropic service instance"""
         scraper = Scraper(
             rss_urls=[url for url in CONFIG.OPENAI_RSS_URLS.split(",")],
@@ -40,67 +35,41 @@ class OpenAiService(BaseNewsService):
 
     def get_orm_model(self):
         return OpenAiArticleORM
-    
-    async def entry_to_scraped_article(self, entry: Dict) -> ScrapedArticle:
-        try:
-            published_parsed = getattr(entry, "published_parsed", None)
-            published_time = datetime(*published_parsed[:6], tzinfo=timezone.utc)
 
-            markdown_content = await self.scraper.scrape_url(
-                url=entry["link"], content_format="markdown"
-            )
-            print(f"\n\n The length of markdown is : ", len(markdown_content))
-
-            return ScrapedArticle(
-                guid=entry.get("id", ""),
-                title=entry.get("title", ""),
-                description=entry.get("description", ""),
-                published_on=published_time,
-                url=entry.get("link", ""),
-                markdown_content=markdown_content,
-            )
-
-        except Exception as e:
-            print(f"Error scraping entry {entry.get('link', 'unknown')}: {e}")
-            return None
-
-    async def transform_to_classified_article(
-        self, scraped_article: ScrapedArticle, session: AsyncSession
+    async def to_service_article(
+        self,
+        entry: Dict,
+        classified_category: ClassifiedCategory,
+        markdown_content: str | None = None,
     ) -> OpenAiArticle:
-        """Transforms a single scraped article into OpenAiArticle"""
-        category_data: CategoriesData = await self.DB_SERVICE.get_categories_data(
-            session=session
-        )
-
-        category_classified: ClassifiedCategory = await classify_category(
-            category_data=category_data.model_dump(), news_title=scraped_article.title
-        )
-
+        published_parsed = getattr(entry, "published_parsed", None)
+        published_time = datetime(*published_parsed[:6], tzinfo=timezone.utc)
         return OpenAiArticle(
-            **scraped_article.model_dump(),
-            category=category_classified.category,
-            sub_category=category_classified.subcategory,
+            guid=entry.get("guid") or entry.get("id"),
+            url=entry.get('link'),
+            title=entry.get("title"),
+            description=entry.get("description"),
+            category=classified_category.category,
+            published_on=published_time,
+            sub_category=(
+                classified_category.subcategory
+                if classified_category.subcategory is not None
+                else None
+            ),
+            markdown_content=markdown_content if markdown_content is not None else None,
         )
-
-    async def scrape_and_classify(
-        self, entry: Dict, session: AsyncSession
-    ) -> OpenAiArticle:
-        scraped_article: ScrapedArticle = await self.entry_to_scraped_article(
-            entry=entry
-        )
-        if scraped_article is not None:
-            openai_article: OpenAiArticle = await self.transform_to_classified_article(
-                scraped_article=scraped_article, session=session
-            )
-            return openai_article 
-        return None
 
 
 if __name__ == "__main__":
 
     async def main():
-        openai = OpenAiService.create()
+        openai = await OpenAiService.create()
         async for session in get_session():
-            await openai.fetch_and_save_articles(session=session, cutoff_hours=48, commit_on_each=True)
+            await openai.fetch_classify_and_save_articles(
+                session=session,
+                cutoff_hours=48,
+                commit_on_each=True,
+                scrape_content=False,
+            )
 
     asyncio.run(main())

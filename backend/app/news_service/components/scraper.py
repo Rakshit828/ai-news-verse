@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter
 
-from app.news_service.scrapers._playwright_scraper import run_playwright
+from app.news_service.components._playwright_scraper import run_playwright
 
 
 class RSSFeedNotAvailable(Exception):

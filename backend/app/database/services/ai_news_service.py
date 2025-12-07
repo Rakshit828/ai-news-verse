@@ -20,7 +20,7 @@ from app.database.models.core import (
     UserSubCategory,
 )
 from app.database.main import get_session
-from app.news_service.types import CategoriesData, ClassifiedArticle
+from app.news_service.types import CategoriesData, ServiceArticle
 from app.database.services.caching import category_caching
 from app.database.schemas.ai_news_service import (
     SetCategorySchema,
@@ -669,7 +669,7 @@ class AiNewsService:
 
     async def create_article(
         self,
-        article: ClassifiedArticle,
+        article: ServiceArticle,
         session: AsyncSession,
     ):
         """Stores the given Classified Article in the database"""
@@ -688,7 +688,7 @@ class AiNewsService:
         return True
 
     async def check_guid(
-        self, guid: str, orm_class: Type[ClassifiedArticle], session: AsyncSession
+        self, guid: str, orm_class: Type[ServiceArticle], session: AsyncSession
     ):
         """Check the existence of guid of articles object."""
         statement = select(orm_class).where(orm_class.guid == guid)

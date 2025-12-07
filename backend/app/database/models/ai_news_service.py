@@ -17,7 +17,7 @@ class GoogleArticles(Base):
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
         pg.TIMESTAMP(timezone=True)
     )
-    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
 
     category_id: Mapped[Optional[str]] = mapped_column(
@@ -43,7 +43,7 @@ class AnthropicArticles(Base):
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
         pg.TIMESTAMP(timezone=True)
     )
-    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
 
     category_id: Mapped[Optional[str]] = mapped_column(
@@ -69,7 +69,7 @@ class OpenAiArticles(Base):
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
         pg.TIMESTAMP(timezone=True)
     )
-    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
 
     category_id: Mapped[Optional[str]] = mapped_column(
@@ -98,7 +98,7 @@ class HackernoonArticles(Base):
     published_on: Mapped[pg.TIMESTAMP] = mapped_column(
         pg.TIMESTAMP(timezone=True)
     )
-    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=False)
+    markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
 
     category_id: Mapped[Optional[str]] = mapped_column(

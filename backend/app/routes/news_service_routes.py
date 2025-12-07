@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, Path, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from typing import List
 
 from app.auth.dependencies import AccessTokenBearer
+from app.notifications import notification_manager
 from app.database.schemas.ai_news_service import (
     SetCategoriesUsers,
     UpdateCategoriesUsers,
@@ -18,6 +20,18 @@ from app.response import SuccessResponse
 
 news_routes = APIRouter()
 ai_news_service = AiNewsService()
+
+
+@news_routes.get("/stream")
+async def stream_news(
+    decoded_token=Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_session),
+):
+    async def event_stream():
+        async for message in notification_manager.connect(user_id=decoded_token['sub']):
+            yield f"data: {message}\n\n"
+    
+    return StreamingResponse(event_stream(), media_type='text/event-stream')
 
 
 @news_routes.post(
@@ -111,7 +125,6 @@ async def create_own_category(
     )
 
 
-
 @news_routes.post(
     "/add-subcategories", response_model=SuccessResponse[List[ResponseCategoryData]]
 )
@@ -121,15 +134,16 @@ async def add_subcategories_to_category(
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[List[ResponseCategoryData]]:
     user_id = decoded_token["sub"]
-    result: List[ResponseCategoryData] = await ai_news_service.add_subcategories_to_existing_category(
-        user_id=user_id, 
-        category_id=payload.category_id,
-        subcategories_data=payload.subcategories,
-        session=session
+    result: List[ResponseCategoryData] = (
+        await ai_news_service.add_subcategories_to_existing_category(
+            user_id=user_id,
+            category_id=payload.category_id,
+            subcategories_data=payload.subcategories,
+            session=session,
+        )
     )
     return SuccessResponse[List[ResponseCategoryData]](
         status_code=status.HTTP_201_CREATED,
         message="Subcategories Added Successfully",
         data=result,
     )
-

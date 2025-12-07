@@ -23,6 +23,8 @@ dependencies = [
     "redis[asyncio]>=7.1.0",
     "argon2-cffi>=25.1.0",
     "annotated-doc>=0.0.4",
+    "apscheduler>=3.11.1",
+    "loguru>=0.7.3",
 ]
 
 [dependency-groups]

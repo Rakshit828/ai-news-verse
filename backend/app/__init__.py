@@ -9,8 +9,18 @@ from app.log import logger
 VERSION = "v1"
 origins = [
     "http://localhost:5173",
+    "http://localhost:5174"
 ]
 
+
+# from contextlib import asynccontextmanager
+# from app.background_services import start_scheduler, scheduler
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     start_scheduler()
+#     yield
+#     scheduler.shutdown()
 
 app = FastAPI(title="AiNewsVerse", version=VERSION)
 
