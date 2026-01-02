@@ -1,18 +1,13 @@
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
-from typing import Sequence, List, Type, Literal
+from sqlalchemy.orm import aliased, selectinload
+from typing import Sequence, List, Literal
 import json
 import asyncio
 from datetime import datetime, timezone, time
-import time as t
 
-from app.database.models.ai_news_service import (
-    AnthropicArticles,
-    GoogleArticles,
-    OpenAiArticles,
-    HackernoonArticles,
-)
+
+from app.database.models.ai_news_service import Articles, Source
 from app.database.models.core import (
     Category,
     SubCategory,
@@ -20,7 +15,7 @@ from app.database.models.core import (
     UserSubCategory,
 )
 from app.database.main import get_session
-from app.news_service.types import CategoriesData, ServiceArticle
+from app.news_service.types import CategoriesData
 from app.database.services.caching import category_caching
 from app.database.schemas.ai_news_service import (
     SetCategorySchema,
@@ -38,24 +33,55 @@ from app.news_service.exceptions import (
     CategoryNotFoundError,
     SubCategoryNotFoundError,
 )
+from loguru import logger
 
 
-async def prepare_article(articles):
-    result_articles = []
-    for row in articles:
-        result_articles.append(
-            {
-                "title": row[0],
-                "url": row[1],
-                "description": row[2],
-                "category_id": row[3],
-                "subcategory_id": row[4],
-            }
+async def get_separate_sources(articles: list[tuple]):
+    google_articles = filter(lambda row: row[5] == Source.GOOGLE.value, articles)
+    anthropic_articles = filter(lambda row: row[5] == Source.ANTHROPIC.value, articles)
+    hackernoon_articles = filter(
+        lambda row: row[5] == Source.HACKERNOON.value, articles
+    )
+    openai_articles = filter(lambda row: row[5] == Source.OPENAI.value)
+    return google_articles, anthropic_articles, openai_articles, hackernoon_articles
+
+
+class BaseDBInteractions:
+    """This class contains the db interactions which are often used."""
+
+    async def get_category_by_id(
+        self, id: str, session: AsyncSession
+    ) -> Category | None:
+        """Gives category orm object by id."""
+        statement = select(Category).where(Category.category_id == id)
+        result = await session.execute(statement)
+        category = result.scalar_one_or_none()
+        return category
+
+    async def get_subcategory_by_id(
+        self, id: str, session: AsyncSession
+    ) -> SubCategory | None:
+        """Gives category orm object by id."""
+        statement = select(SubCategory).where(SubCategory.subcategory_id == id)
+        result = await session.execute(statement)
+        subcategory = result.scalar_one_or_none()
+        return subcategory
+
+    async def check_category_exists(
+        self, category_id: str, session: AsyncSession
+    ) -> bool:
+        category: Category | None = await self.get_category_by_id(
+            id=category_id, session=session
         )
-    return result_articles
+        return True if category is not None else False
 
-
-class AiNewsService:
+    async def check_subcategory_exists(
+        self, subcategory_id: str, session: AsyncSession
+    ) -> bool:
+        subcategory: SubCategory | None = await self.get_subcategory_by_id(
+            id=subcategory_id, session=session
+        )
+        return True if subcategory is not None else False
 
     @staticmethod
     async def fetch_from_db(
@@ -67,7 +93,11 @@ class AiNewsService:
         elif to == "list":
             return result.scalars().all()
 
+
+class CategoriesDBService(BaseDBInteractions):
+    @staticmethod
     async def _initialize_categories(self, session: AsyncSession):
+        """Just a initialization function to set the base categories and subcategories in the database."""
         with open(
             r"D:\GenAI\AiNewsSystem\backend\app\database\models\_category.json",
             "r",
@@ -96,46 +126,27 @@ class AiNewsService:
         else:
             print("Returned from db")
             category_data = {"categories": []}
-            statement = select(Category)
+            statement = select(Category).options(selectinload(Category.subcategories))
             result = await session.execute(statement)
             categories = result.scalars().all()
             for category in categories:
                 single_cat_data = {
                     "category_id": category.category_id,
                     "title": category.title,
-                    "subcategories": [],
-                }
-                subcategories = await self.get_subcategories_for_category_by_id(
-                    category_id=category.category_id, session=session
-                )
-                for sub_cat in subcategories:
-                    single_cat_data["subcategories"].append(
+                    "subcategories": [
                         {
-                            "subcategory_id": sub_cat.subcategory_id,
-                            "title": sub_cat.title,
+                            "subcategory_id": subcategory.subcategory_id,
+                            "title": subcategory.title,
                         }
-                    )
+                        for subcategory in category.subcategories
+                    ],
+                }
+
                 category_data["categories"].append(single_cat_data)
 
                 await category_caching.set_category_data(category_data)
 
             return CategoriesData(**category_data)
-
-    async def check_category_exists(
-        self, category_id: str, session: AsyncSession
-    ) -> bool:
-        category: Category | None = await self.get_category_by_id(
-            id=category_id, session=session
-        )
-        return True if category is not None else False
-
-    async def check_subcategory_exists(
-        self, subcategory_id: str, session: AsyncSession
-    ) -> bool:
-        subcategory: SubCategory | None = await self.get_subcategory_by_id(
-            id=subcategory_id, session=session
-        )
-        return True if subcategory is not None else False
 
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "title"], session: AsyncSession
@@ -161,27 +172,10 @@ class AiNewsService:
         result = (await session.execute(statement=statement)).scalars().all()
         return result if result else None
 
-    async def get_category_by_id(
-        self, id: str, session: AsyncSession
-    ) -> Category | None:
-        """Gives category orm object by id."""
-        statement = select(Category).where(Category.category_id == id)
-        result = await session.execute(statement)
-        category = result.scalar_one_or_none()
-        return category
-
-    async def get_subcategory_by_id(
-        self, id: str, session: AsyncSession
-    ) -> SubCategory | None:
-        """Gives category orm object by id."""
-        statement = select(SubCategory).where(SubCategory.subcategory_id == id)
-        result = await session.execute(statement)
-        subcategory = result.scalar_one_or_none()
-        return subcategory
-
     async def filter_not_existing_categories(
         self, categories_id: List[str], session: AsyncSession
     ) -> List[str] | None:
+        """Returns the category_id list from given category_ids which doesnn't exist in the database."""
         existing_categories: List[str] = await self.get_category_column(
             column="category_id", session=session
         )
@@ -193,6 +187,7 @@ class AiNewsService:
     async def filter_not_existing_subcategories(
         self, subcategories_id: List[str], session: AsyncSession
     ) -> List[str] | None:
+        """Returns the subcategory_id list from given subcategory_ids which doesnn't exist in the database."""
         existing_subcategories: List[str] = await self.get_subcategory_column(
             column="subcategory_id", session=session
         )
@@ -209,11 +204,6 @@ class AiNewsService:
         result = await session.execute(statement)
         subcategories = result.scalars().all()
         return subcategories
-
-    async def check_subcategories_existence(
-        self, subcategories_id, session: AsyncSession
-    ):
-        await self.get_subcategory_column(column="subcategory_id", session=session)
 
     async def _add_existing_category_to_users(
         self,
@@ -582,7 +572,14 @@ class AiNewsService:
         ]
         return category_data
 
-    # Functions for NEWS ARTICLES
+
+class NewsDBService:
+
+    def __init__(self, category_service: CategoriesDBService | None = None):
+        self.category_service: CategoriesDBService | None = (
+            category_service or CategoriesDBService()
+        )
+
     async def get_today_news(
         self, user_id: str, session: AsyncSession
     ) -> TodayNewsResponse:
@@ -590,86 +587,42 @@ class AiNewsService:
         now = datetime.now(timezone.utc)
         # THis is the filter after mindnight 12
         today = datetime.combine(now.date(), time(0, 0, 0, tzinfo=timezone.utc))
-        user_subcategories: List[str] = await self.get_user_subcategories_id(
-            user_id=user_id, session=session
-        )
-
-        statement_google = select(
-            GoogleArticles.title,
-            GoogleArticles.url,
-            GoogleArticles.description,
-            GoogleArticles.category_id,
-            GoogleArticles.subcategory_id,
-        ).where(
-            GoogleArticles.published_on >= today,
-            GoogleArticles.subcategory_id.in_(user_subcategories),
-        )
-        statement_anthropic = select(
-            AnthropicArticles.title,
-            AnthropicArticles.url,
-            AnthropicArticles.description,
-            AnthropicArticles.category_id,
-            AnthropicArticles.subcategory_id,
-        ).where(
-            AnthropicArticles.published_on >= today,
-            AnthropicArticles.subcategory_id.in_(user_subcategories),
-        )
-        statement_openai = select(
-            OpenAiArticles.title,
-            OpenAiArticles.url,
-            OpenAiArticles.description,
-            OpenAiArticles.category_id,
-            OpenAiArticles.subcategory_id,
-        ).where(
-            OpenAiArticles.published_on >= today,
-            OpenAiArticles.subcategory_id.in_(user_subcategories),
-        )
-        statement_hackernoon = select(
-            HackernoonArticles.title,
-            HackernoonArticles.url,
-            HackernoonArticles.description,
-            HackernoonArticles.category_id,
-            HackernoonArticles.subcategory_id,
-        ).where(
-            HackernoonArticles.published_on >= today,
-            HackernoonArticles.subcategory_id.in_(user_subcategories),
-        )
-
-        start = t.time()
-        google_articles, anthropic_articles, openai_articles, hackernoon_articles = (
-            await asyncio.gather(
-                self.fetch_from_db(statement_google, session=session, to="rows"),
-                self.fetch_from_db(statement_anthropic, session=session, to="rows"),
-                self.fetch_from_db(statement_openai, session=session, to="rows"),
-                self.fetch_from_db(statement_hackernoon, session=session, to="rows"),
+        user_subcategories: List[str] = (
+            await self.category_service.get_user_subcategories_id(
+                user_id=user_id, session=session
             )
         )
-        print("Fetched in : ", t.time() - start )
 
-        (
-            response_google_articles,
-            response_anthropic_articles,
-            response_openai_articles,
-            response_hackernoon_articles,
-        ) = await asyncio.gather(
-            prepare_article(google_articles),
-            prepare_article(anthropic_articles),
-            prepare_article(openai_articles),
-            prepare_article(hackernoon_articles),
+        statement = select(
+            Articles.title,
+            Articles.url,
+            Articles.description,
+            Articles.category_id,
+            Articles.subcategory_id,
+            Articles.source,
+        ).where(
+            Articles.published_on >= today,
+            Articles.subcategory_id.in_(user_subcategories),
         )
 
+        result = await session.execute(statement)
+        articles = result.scalars().all()
+
+        google_articles, anthropic_articles, openai_articles, hackernoon_articles = (
+            await get_separate_sources(articles=articles)
+        )
 
         today_news_response = TodayNewsResponse(
-            google=response_google_articles,
-            anthropic=response_anthropic_articles,
-            openai=response_openai_articles,
-            hackernoon=response_hackernoon_articles,
+            google=google_articles,
+            anthropic=anthropic_articles,
+            openai=openai_articles,
+            hackernoon=hackernoon_articles,
         )
         return today_news_response
 
     async def create_article(
         self,
-        article: ServiceArticle,
+        article: Articles,
         session: AsyncSession,
     ):
         """Stores the given Classified Article in the database"""
@@ -679,7 +632,7 @@ class AiNewsService:
 
     async def bulk_create_articles(
         self,
-        articles: List[AnthropicArticles] | List[OpenAiArticles] | List[GoogleArticles],
+        articles: List[Articles],
         session: AsyncSession,
     ):
         """Stores the list of Classified Category object."""
@@ -687,20 +640,31 @@ class AiNewsService:
         await session.commit()
         return True
 
+
     async def check_guid(
-        self, guid: str, orm_class: Type[ServiceArticle], session: AsyncSession
+        self, guid: str, source: str, session: AsyncSession
     ):
         """Check the existence of guid of articles object."""
-        statement = select(orm_class).where(orm_class.guid == guid)
+        statement = select(Articles).where(Articles.guid == guid and Articles.source == source)
         result = await session.execute(statement)
         return result.scalar_one_or_none()
 
+    async def get_all_guids(
+        self, source: str, session: AsyncSession
+    ):
+        """Returns all the guids associated with the category."""
+        statement = select(Articles.guid).where(Articles.source == source)
+        result = session.execute(statement)
+        return result.scalars().all()
+
+
 
 if __name__ == "__main__":
-    ai_news_service = AiNewsService()
+    category_services = CategoriesDBService()
+    news_services = NewsDBService()
 
     async def main():
         async for session in get_session():
-            await ai_news_service._initialize_categories(session)
+            await category_services._initialize_categories(session)
 
     asyncio.run(main())

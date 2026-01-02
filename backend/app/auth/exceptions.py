@@ -8,7 +8,7 @@ class InvalidTokenSchemaError(ErrorResponse[T]):
     error: str = "invalid_token_schema_error"
     message: str = "Given dictionary is invalid for the tokens setup in cookies"
     data: T | None = None
-
+ 
 # Authentication-related Errors
 class EmailValidationError(ErrorResponse[T]):
     status_code: int = status.HTTP_400_BAD_REQUEST

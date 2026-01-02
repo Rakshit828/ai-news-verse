@@ -3,17 +3,11 @@ from typing import Dict
 from datetime import datetime, timezone
 from app.config import CONFIG
 from app.news_service.types import OpenAiArticle, ClassifiedCategory
-from app.news_service._base import BaseNewsService
+from app.news_service._base import BaseNewsService, InvalidScraper
 from app.news_service.components.scraper import Scraper
 
-from app.database.models.ai_news_service import (
-    OpenAiArticles as OpenAiArticleORM,
-)
-from app.database.main import AsyncSession, get_session
+from app.database.models.ai_news_service import Source
 
-
-class InvalidScraper(Exception):
-    pass
 
 
 class OpenAiService(BaseNewsService):
@@ -33,8 +27,8 @@ class OpenAiService(BaseNewsService):
         )
         return cls(scraper=scraper)
 
-    def get_orm_model(self):
-        return OpenAiArticleORM
+    def get_source(self):
+        return Source.OPENAI.value
 
     async def to_service_article(
         self,
@@ -60,16 +54,3 @@ class OpenAiService(BaseNewsService):
         )
 
 
-if __name__ == "__main__":
-
-    async def main():
-        openai = await OpenAiService.create()
-        async for session in get_session():
-            await openai.fetch_classify_and_save_articles(
-                session=session,
-                cutoff_hours=48,
-                commit_on_each=True,
-                scrape_content=False,
-            )
-
-    asyncio.run(main())

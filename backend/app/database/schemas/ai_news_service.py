@@ -61,18 +61,18 @@ class BaseArticleResponse(BaseModel):
 
 
 class GoogleNewsResponse(BaseArticleResponse):
-    news_from: str = 'Google News'
+    source: str = 'GOOGLE'
 
 
 class AnthropicNewsResponse(BaseArticleResponse):
-    news_from: str = 'Anthropic'
+    source: str = 'ANTHROPIC'
 
 
 class OpenaiNewsResponse(BaseArticleResponse):
-    news_from: str = 'Openai'
+    source: str = 'OPENAI'
 
 class HackernoonResponse(BaseArticleResponse):
-    news_from: str = 'Hackernoon'
+    source: str = 'HACKERNOON'
 
 
 class TodayNewsResponse(BaseModel):

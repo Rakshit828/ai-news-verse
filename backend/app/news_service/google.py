@@ -1,20 +1,15 @@
 import asyncio
-from typing import List, Dict
+from typing import Dict
 from datetime import datetime, timezone
 from app.news_service.types import (
     ClassifiedCategory,
 )
-from app.news_service._base import BaseNewsService
+from app.news_service._base import BaseNewsService, InvalidScraper
 from app.news_service.components.scraper import Scraper
 from app.news_service.types import GoogleArticle
-from app.database.models.ai_news_service import (
-    GoogleArticles as GoogleArticleORM,
-)
-from app.database.main import get_session
 
+from app.database.models.ai_news_service import Source
 
-class InvalidScraper(Exception):
-    pass
 
 
 class GoogleService(BaseNewsService):
@@ -30,31 +25,17 @@ class GoogleService(BaseNewsService):
         self.scraper = scraper
 
     @classmethod
-    async def create(cls):
+    async def create(cls, rss_urls: list[str]):
         """Factory method to create Anthropic service instance"""
-        rss_urls = await cls._construct_rss_urls()
         scraper = Scraper(
             rss_urls=rss_urls,
             requires_playwright=True,
         )
         return cls(scraper=scraper)
 
-    @classmethod
-    async def _construct_rss_urls(cls) -> List[str]:
-        """Returns the list of rss urls with categories from database."""
-        async for session in get_session():
-            sub_cat_ids: List[str] = await cls.DB_SERVICE.get_subcategory_column(
-                column="subcategory_id", session=session
-            )
-            rss_urls = [
-                cls.BASE_URL.format(sub_category_query=sub_cat_id)
-                for sub_cat_id in sub_cat_ids
-            ]
-            print("RSS URLS ARE : ", rss_urls)
-            return rss_urls
 
-    def get_orm_model(self):
-        return GoogleArticleORM
+    def get_source(self):
+        return Source.GOOGLE.value
 
     async def to_service_article(
         self,
@@ -80,18 +61,3 @@ class GoogleService(BaseNewsService):
         )
 
 
-if __name__ == "__main__":
-
-    async def main():
-        google = await GoogleService.create()
-        print(google.scraper.rss_urls)
-
-        async for session in get_session():
-            await google.fetch_classify_and_save_articles(
-                session=session,
-                cutoff_hours=24,
-                commit_on_each=True,
-                scrape_content=False,
-            )
-
-    asyncio.run(main())

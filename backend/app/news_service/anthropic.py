@@ -9,10 +9,7 @@ from app.news_service.types import (
 from app.news_service._base import BaseNewsService
 from app.news_service.components.scraper import Scraper
 
-from app.database.models.ai_news_service import (
-    AnthropicArticles as AnthropicArticleORM,
-)
-from app.database.main import get_session
+from app.database.models.ai_news_service import Source
 
 
 class InvalidScraper(Exception):
@@ -35,8 +32,8 @@ class AnthropicService(BaseNewsService):
         )
         return cls(scraper=scraper)
 
-    def get_orm_model(self):
-        return AnthropicArticleORM
+    def get_source(self):
+        return Source.ANTHROPIC.value
 
     async def to_service_article(
         self,
@@ -61,18 +58,3 @@ class AnthropicService(BaseNewsService):
             markdown_content=markdown_content if markdown_content is not None else None,
         )
 
-
-if __name__ == "__main__":
-
-    async def main():
-        anthropic = await AnthropicService.create()
-
-        async for session in get_session():
-            await anthropic.fetch_classify_and_save_articles(
-                session=session,
-                cutoff_hours=48,
-                commit_on_each=True,
-                scrape_content=False,
-            )
-
-    asyncio.run(main())

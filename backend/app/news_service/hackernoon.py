@@ -4,18 +4,13 @@ from datetime import datetime, timezone
 from app.news_service.types import (
     ClassifiedCategory,
 )
-from app.news_service._base import BaseNewsService
+from app.news_service._base import BaseNewsService, InvalidScraper
 from app.news_service.components.scraper import Scraper
 from app.news_service.types import HackernoonArticle
-from app.database.models.ai_news_service import (
-    HackernoonArticles as HackernoonArticleORM,
-)
-from app.database.main import get_session
+
+from app.database.models.ai_news_service import Source
 from app.config import CONFIG
 
-
-class InvalidScraper(Exception):
-    pass
 
 
 class HackernoonService(BaseNewsService):
@@ -35,8 +30,8 @@ class HackernoonService(BaseNewsService):
         )
         return cls(scraper=scraper)
 
-    def get_orm_model(self):
-        return HackernoonArticleORM
+    def get_source(self):
+        return Source.HACKERNOON.value
 
     async def to_service_article(
         self,
@@ -61,19 +56,3 @@ class HackernoonService(BaseNewsService):
             markdown_content=markdown_content if markdown_content is not None else None,
         )
 
-
-if __name__ == "__main__":
-
-    async def main():
-        hackernoon = await HackernoonService.create()
-        print(hackernoon.scraper.rss_urls)
-
-        async for session in get_session():
-            await hackernoon.fetch_classify_and_save_articles(
-                session=session,
-                cutoff_hours=24,
-                commit_on_each=True,
-                scrape_content=False,
-            )
-
-    asyncio.run(main())
