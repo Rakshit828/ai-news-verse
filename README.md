@@ -81,6 +81,8 @@ the blog post / articles and opinions on AI.
 - **React Router** - Client-side routing
 - **Shadcn/UI** - Beautiful component library
 
+The frontend is heavily built by AI.
+
 ### Backend
 - **Python 3.12** - Latest Python version
 - **FastAPI** - Modern, fast web framework
