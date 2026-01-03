@@ -7,7 +7,17 @@ from loguru import logger
 from app.config import CONFIG
 
 
+class TitleCategoryRecord(TypedDict):
+    id: str
+    title: str
+    category: str
+    subcategory: str
+
+
 class PineconeClient:
+    NAMESPACES = {
+        "title-category-namespace": "title-category-namespace"
+    }
     def __init__(self, index):
         self.index: _IndexAsyncio = index
 
@@ -21,11 +31,21 @@ class PineconeClient:
                 region="us-east-1",
                 embed={
                     "model": "llama-text-embed-v2",
-                    "field_map": {"text": "chunk_text", "dimension": 2048},
+                    "field_map": {"text": "title", "dimension": 2048},
                 },
             )
         index = client.IndexAsyncio(host=host)
         return cls(index)
+
+
+    async def upsert_records(self, records: List[TitleCategoryRecord]):
+        try:
+            await self.index.upsert(
+                namespace=self.NAMESPACES.get('title-category-namespace', 'title-category-namespace'),
+                records=records,
+            )
+        except PineconeApiException as e:
+            pass
 
     
 
