@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict
 from datetime import datetime, timezone
 from app.config import CONFIG

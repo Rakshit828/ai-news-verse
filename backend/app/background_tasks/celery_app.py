@@ -1,10 +1,13 @@
 from celery import Celery
+from celery.schedules import crontab, schedule
 
 app = Celery(
     "celery_app",
     broker='redis://localhost:6379/0',
     backend='redis://localhost:6379/1'
 )
+
+app.autodiscover_tasks()
 
 
 # Optional global configuration
@@ -20,3 +23,13 @@ app.conf.update(
         '*': {'rate_limit': '10/s'}  # Limit task execution rate globally
     },
 )
+
+
+CELERY_BEAT_SCHEDULE = {
+    "fetch-news-every-30min": {
+        "task": "celery_app.scrape_and_store_news",
+        "schedule": schedule(60)
+    }
+}
+
+app.conf.beat_schedule = CELERY_BEAT_SCHEDULE

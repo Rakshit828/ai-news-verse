@@ -1,7 +1,7 @@
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
-from typing import Sequence, List, Literal
+from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
 from datetime import datetime, timezone, time
@@ -17,6 +17,13 @@ from app.database.models.core import (
 from app.database.main import get_session
 from app.news_service.types import CategoriesData
 from app.database.services.caching import category_caching
+from app.database.schemas.ai_news_service import (
+    GoogleNewsResponse,
+    AnthropicNewsResponse,
+    HackernoonResponse,
+    OpenaiNewsResponse,
+    TodayNewsResponse,
+)
 from app.database.schemas.ai_news_service import (
     SetCategorySchema,
     SetCategoriesUsers,
@@ -34,16 +41,6 @@ from app.news_service.exceptions import (
     SubCategoryNotFoundError,
 )
 from loguru import logger
-
-
-async def get_separate_sources(articles: list[tuple]):
-    google_articles = filter(lambda row: row[5] == Source.GOOGLE.value, articles)
-    anthropic_articles = filter(lambda row: row[5] == Source.ANTHROPIC.value, articles)
-    hackernoon_articles = filter(
-        lambda row: row[5] == Source.HACKERNOON.value, articles
-    )
-    openai_articles = filter(lambda row: row[5] == Source.OPENAI.value)
-    return google_articles, anthropic_articles, openai_articles, hackernoon_articles
 
 
 class BaseDBInteractions:
@@ -580,6 +577,43 @@ class NewsDBService:
             category_service or CategoriesDBService()
         )
 
+    @staticmethod
+    async def get_separate_sources(articles: list[tuple]) -> Tuple[
+        Tuple[GoogleNewsResponse, ...],
+        Tuple[AnthropicNewsResponse, ...],
+        Tuple[OpenaiNewsResponse, ...],
+        Tuple[HackernoonResponse, ...],
+    ]:
+        google_articles: List[GoogleNewsResponse] = []
+        anthropic_articles: List[AnthropicNewsResponse] = []
+        openai_articles: List[OpenaiNewsResponse] = []
+        hackernoon_articles: List[HackernoonResponse] = []
+
+        for row in articles:
+            data = {
+                "title": row[0],
+                "url": row[1],
+                "description": row[2],
+                "category_id": row[3],
+                "subcategory_id": row[4],
+            }
+            src = row[5]
+            if src == "GOOGLE":
+                google_articles.append(GoogleNewsResponse(**data))
+            elif src == "ANTHROPIC":
+                anthropic_articles.append(AnthropicNewsResponse(**data))
+            elif src == "OPENAI":
+                openai_articles.append(OpenaiNewsResponse(**data))
+            elif src == "HACKERNOON":
+                hackernoon_articles.append(HackernoonResponse(**data))
+
+        return (
+            tuple(google_articles),
+            tuple(anthropic_articles),
+            tuple(openai_articles),
+            tuple(hackernoon_articles),
+        )
+
     async def get_today_news(
         self, user_id: str, session: AsyncSession
     ) -> TodayNewsResponse:
@@ -606,10 +640,10 @@ class NewsDBService:
         )
 
         result = await session.execute(statement)
-        articles = result.scalars().all()
+        articles = result.all()
 
         google_articles, anthropic_articles, openai_articles, hackernoon_articles = (
-            await get_separate_sources(articles=articles)
+            await NewsDBService.get_separate_sources(articles=articles)
         )
 
         today_news_response = TodayNewsResponse(
@@ -640,23 +674,19 @@ class NewsDBService:
         await session.commit()
         return True
 
-
-    async def check_guid(
-        self, guid: str, source: str, session: AsyncSession
-    ):
+    async def check_guid(self, guid: str, source: str, session: AsyncSession):
         """Check the existence of guid of articles object."""
-        statement = select(Articles).where(Articles.guid == guid and Articles.source == source)
+        statement = select(Articles).where(
+            Articles.guid == guid and Articles.source == source
+        )
         result = await session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def get_all_guids(
-        self, source: str, session: AsyncSession
-    ):
+    async def get_all_guids(self, source: str, session: AsyncSession):
         """Returns all the guids associated with the category."""
         statement = select(Articles.guid).where(Articles.source == source)
         result = session.execute(statement)
         return result.scalars().all()
-
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 class SubCategorySchema(BaseModel):
     subcategory_id: str
@@ -76,8 +76,8 @@ class HackernoonResponse(BaseArticleResponse):
 
 
 class TodayNewsResponse(BaseModel):
-    google: List[GoogleNewsResponse]
-    anthropic: List[AnthropicNewsResponse]
-    openai: List[OpenaiNewsResponse]
-    hackernoon: List[HackernoonResponse]
-
+    google: Tuple[GoogleNewsResponse, ...] | None = None
+    anthropic: Tuple[AnthropicNewsResponse, ...] | None = None
+    openai: Tuple[OpenaiNewsResponse, ...] | None = None
+    hackernoon: Tuple[HackernoonResponse, ...] | None = None
+ 
