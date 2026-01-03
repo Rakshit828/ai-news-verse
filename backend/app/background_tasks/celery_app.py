@@ -1,10 +1,11 @@
 from celery import Celery
 from celery.schedules import crontab, schedule
+from app.config import CONFIG
 
 app = Celery(
     "celery_app",
-    broker='redis://localhost:6379/0',
-    backend='redis://localhost:6379/1'
+    broker=CONFIG.CELERY_BROKER_URL,
+    backend=CONFIG.CELERY_RESULT_BACKEND
 )
 
 app.autodiscover_tasks()
@@ -26,9 +27,9 @@ app.conf.update(
 
 
 CELERY_BEAT_SCHEDULE = {
-    "fetch-news-every-30min": {
+    "fetch-news-everyday-at-12-00": {
         "task": "celery_app.scrape_and_store_news",
-        "schedule": schedule(60)
+        "schedule": crontab(hour=12, minute=0)
     }
 }
 

@@ -13,8 +13,8 @@ from app.auth.exceptions import (
     EmailAlreadyExistsError,
     EmailNotFoundError
 )
-from app.database.models.core import Users
-from app.database.schemas.auth import UserCreateSchema, UserLogInSchema
+from app.db.models.core import Users
+from app.schemas.auth import UserCreateSchema, UserLogInSchema
 
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from uuid import UUID
 from typing import List
-from sqlalchemy import String, Boolean, text, func, ForeignKey
+from sqlalchemy import String, text, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import sqlalchemy.dialects.postgresql as pg
 

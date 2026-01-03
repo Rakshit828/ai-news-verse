@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, status
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from typing import List
 
 from app.auth.dependencies import AccessTokenBearer
-from app.database.schemas.ai_news_service import (
+from app.schemas.ai_news_service import (
     SetCategoriesUsers,
     UpdateCategoriesUsers,
     CreateCategoryData,
@@ -12,8 +11,8 @@ from app.database.schemas.ai_news_service import (
     ResponseCategoryData,
     AddSubcategoriesToCategorySchema,
 )
-from app.database.services.ai_news_service import NewsDBService, CategoriesDBService
-from app.database.main import get_session
+from app.controllers.ai_news_service import NewsDBService, CategoriesDBService
+from app.db.main import get_session
 from app.response import SuccessResponse
 from loguru import logger
 

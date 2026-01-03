@@ -4,10 +4,10 @@ from fastapi.security import APIKeyCookie
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 
-from app.database.models.core import Users
-from app.database.main import get_session
+from app.db.models.core import Users
+from app.db.main import get_session
 from app.auth.utils import decode_jwt_tokens
-from app.database.services.auth import AuthService
+from app.controllers.auth import AuthService
 from app.auth.exceptions import InvalidJWTTokenError, UserNotFoundError, PermissionDeniedError
 from app.response import AppError
 

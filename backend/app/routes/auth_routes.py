@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from app.database.main import get_session
+from app.db.main import get_session
 from app.config import CONFIG
-from app.database.services.auth import AuthService
+from app.controllers.auth import AuthService
 from app.auth.dependencies import RefreshTokenBearer
 from app.auth.utils import create_jwt_tokens
-from app.database.schemas.auth import (
+from app.schemas.auth import (
     UserCreateSchema,
     UserResponseSchema,
     UserLogInSchema,

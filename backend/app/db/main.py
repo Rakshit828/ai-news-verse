@@ -19,5 +19,11 @@ Session = sessionmaker(
 # Dependency for FastAPI
 async def get_session():
     async with Session() as session:
-        yield session
+        try:
+            yield session
+        except Exception as e:
+            await session.rollback()
+            raise e
+        finally:
+            await session.close()
 

@@ -56,12 +56,12 @@ class NewsRepository:
         )
 
     async def articles_to_orm_list(self, articles: List[ServiceArticle]) -> List:
+        """Convert list of classified articles to ORM objects"""
         if not isinstance(articles[0], ServiceArticle):
             raise InvalidArgument(
                 f"Invalid argument type of {articles[0].__class__}. It must be {ServiceArticle.__args__}"
             )
 
-        """Convert list of classified articles to ORM objects"""
         return [await self.article_to_orm(article) for article in articles]
 
     async def check_entry(
@@ -202,6 +202,8 @@ class NewsRepository:
             if classified_articles:
                 await self.bulk_save_articles(classified_articles, session)
             return len(classified_articles)
+
+
 
 
 if __name__ == "__main__":

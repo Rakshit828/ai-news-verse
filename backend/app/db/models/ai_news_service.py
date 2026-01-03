@@ -4,7 +4,7 @@ import sqlalchemy.dialects.postgresql as pg
 from typing import Optional
 import enum
 
-from app.database.main import Base
+from app.db.main import Base
 
 
 class Source(str, enum.Enum):
@@ -12,6 +12,7 @@ class Source(str, enum.Enum):
     ANTHROPIC = "ANTHROPIC"
     OPENAI = "OPENAI"
     HACKERNOON = "HACKERNOON"
+
 
 
 class Articles(Base):
@@ -28,6 +29,7 @@ class Articles(Base):
     markdown_content: Mapped[str] = mapped_column(pg.TEXT, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(pg.TEXT, nullable=True)
 
+    # Foreign keys
     category_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("news_categories.category_id", ondelete="SET NULL"), nullable=False
     )

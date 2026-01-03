@@ -1,30 +1,30 @@
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import aliased, selectinload, with_loader_criteria, joinedload
 from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
 from datetime import datetime, timezone, time
 
 
-from app.database.models.ai_news_service import Articles, Source
-from app.database.models.core import (
+from app.db.models.ai_news_service import Articles, Source
+from app.db.models.core import (
     Category,
     SubCategory,
     UserCategory,
     UserSubCategory,
 )
-from app.database.main import get_session
+from app.db.main import get_session
 from app.news_service.types import CategoriesData
-from app.database.services.caching import category_caching
-from app.database.schemas.ai_news_service import (
+from app.controllers.caching import category_caching
+from app.schemas.ai_news_service import (
     GoogleNewsResponse,
     AnthropicNewsResponse,
     HackernoonResponse,
     OpenaiNewsResponse,
     TodayNewsResponse,
 )
-from app.database.schemas.ai_news_service import (
+from app.schemas.ai_news_service import (
     SetCategorySchema,
     SetCategoriesUsers,
     CreateSubcategorySchema,
@@ -34,7 +34,7 @@ from app.database.schemas.ai_news_service import (
     ResponseCategoryData,
 )
 from app.response import AppError
-from app.news_service.exceptions import (
+from app.exceptions import (
     CategoryAlreadyExistsError,
     SubCategoryAlreadyExistsError,
     CategoryNotFoundError,
@@ -93,25 +93,47 @@ class BaseDBInteractions:
 
 class CategoriesDBService(BaseDBInteractions):
     @staticmethod
-    async def _initialize_categories(self, session: AsyncSession):
-        """Just a initialization function to set the base categories and subcategories in the database."""
+    async def _initialize_categories(session: AsyncSession):
         with open(
-            r"D:\GenAI\AiNewsSystem\backend\app\database\models\_category.json",
+            r"D:\GenAI\AiNewsSystem\backend\app\db\models\_category.json",
             "r",
             encoding="utf-8",
         ) as f:
             categories_data = json.load(f)["categories"]
-            for category in categories_data:
-                cat = Category(category_id=category["id"], title=category["title"])
-                session.add(cat)
-                for sub_category in category["subcategories"]:
-                    sub_cat = SubCategory(
-                        subcategory_id=sub_category["id"],
-                        category_id=cat.category_id,
-                        title=sub_category["title"],
-                    )
-                    session.add(sub_cat)
-            await session.commit()
+
+        category_rows = []
+        subcategory_rows = []
+
+        for category in categories_data:
+            category_rows.append(
+                {
+                    "category_id": category["id"],
+                    "title": category["title"],
+                }
+            )
+
+            for sub in category["subcategories"]:
+                subcategory_rows.append(
+                    {
+                        "subcategory_id": sub["id"],
+                        "title": sub["title"],
+                        "category_id": category["id"],
+                    }
+                )
+
+        if category_rows:
+            await session.execute(
+                insert(Category),
+                category_rows,
+            )
+
+        if subcategory_rows:
+            await session.execute(
+                insert(SubCategory),
+                subcategory_rows,
+            )
+
+        await session.commit()
 
     async def get_categories_data(self, session: AsyncSession) -> CategoriesData:
         """Returs the full category and subcategory data from the table except custom ones."""
@@ -123,9 +145,20 @@ class CategoriesDBService(BaseDBInteractions):
         else:
             print("Returned from db")
             category_data = {"categories": []}
-            statement = select(Category).options(selectinload(Category.subcategories))
+            statement = (
+                select(Category)
+                .where(Category.added_by_users == False)
+                .options(
+                    joinedload(Category.subcategories),
+                    with_loader_criteria(
+                        SubCategory,
+                        SubCategory.added_by_users == False,
+                        include_aliases=True,
+                    ),
+                )
+            )
             result = await session.execute(statement)
-            categories = result.scalars().all()
+            categories = result.unique().scalars().all()
             for category in categories:
                 single_cat_data = {
                     "category_id": category.category_id,
@@ -147,7 +180,7 @@ class CategoriesDBService(BaseDBInteractions):
 
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "title"], session: AsyncSession
-    ) -> List[str]:
+    ) -> List[str] | None:
         """Returns all the ids of subcategories."""
         match (column):
             case "subcategory_id":
@@ -157,22 +190,28 @@ class CategoriesDBService(BaseDBInteractions):
         result = (await session.execute(statement)).scalars().all()
         return result if result else None
 
+
     async def get_category_column(
         self, column: Literal["category_id", "title"], session: AsyncSession
-    ) -> List[str]:
+    ) -> List[str] | None:
         """Returns all the ids of subcategories."""
         match (column):
             case "category_id":
-                statement = select(Category.category_id)
+                statement = select(Category.category_id).where(
+                    Category.added_by_users == False
+                )
             case "title":
-                statement = select(Category.title)
+                statement = select(Category.title).where(
+                    Category.added_by_users == False
+                )
         result = (await session.execute(statement=statement)).scalars().all()
         return result if result else None
+
 
     async def filter_not_existing_categories(
         self, categories_id: List[str], session: AsyncSession
     ) -> List[str] | None:
-        """Returns the category_id list from given category_ids which doesnn't exist in the database."""
+        """Returns the category_id list from given category_ids which doesnn't exist in the db."""
         existing_categories: List[str] = await self.get_category_column(
             column="category_id", session=session
         )
@@ -184,7 +223,7 @@ class CategoriesDBService(BaseDBInteractions):
     async def filter_not_existing_subcategories(
         self, subcategories_id: List[str], session: AsyncSession
     ) -> List[str] | None:
-        """Returns the subcategory_id list from given subcategory_ids which doesnn't exist in the database."""
+        """Returns the subcategory_id list from given subcategory_ids which doesnn't exist in the db."""
         existing_subcategories: List[str] = await self.get_subcategory_column(
             column="subcategory_id", session=session
         )
@@ -393,7 +432,7 @@ class CategoriesDBService(BaseDBInteractions):
         if not_existing_subcategories is None:
             raise AppError(
                 SubCategoryAlreadyExistsError(
-                    message=f"Subcategories '{" ".join(subcategories_id)}' already exists"
+                    message=f"Subcategories '{', '.join(subcategories_id)}' already exist"
                 )
             )
         already_existing_subcategories = set(subcategories_id) - set(
@@ -402,7 +441,7 @@ class CategoriesDBService(BaseDBInteractions):
         if already_existing_subcategories:
             raise AppError(
                 SubCategoryAlreadyExistsError(
-                    message=f"Subcategories {" ".join(already_existing_subcategories)} already exists"
+                    message=f"Subcategories '{', '.join(already_existing_subcategories)}' already exist"
                 )
             )
         # Checks for category and subcategory for existence is done
@@ -415,7 +454,6 @@ class CategoriesDBService(BaseDBInteractions):
             for subcategory in category_data.subcategories
         ]
         session.add(category_orm)
-        await session.commit()
 
         # Addition of new category and subcategories done. Now, liking it with the users
         user_category = UserCategory(
@@ -659,7 +697,7 @@ class NewsDBService:
         article: Articles,
         session: AsyncSession,
     ):
-        """Stores the given Classified Article in the database"""
+        """Stores the given Classified Article in the db"""
         session.add(article)
         await session.commit()
         return True

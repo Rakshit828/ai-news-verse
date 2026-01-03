@@ -8,6 +8,13 @@ class Config(BaseSettings):
     REFRESH_TOKEN_EXPIRY_DAYS: int
     ACCESS_TOKEN_EXPIRY_MINUTES: int
 
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
+
+    PINECONE_API_KEY: str
+    PINECONE_HOST: str
+
+
     GROQ_API_KEY: str
 
     ANTHROPIC_RSS_URLS: str

@@ -8,7 +8,7 @@ from app.news_service._base import BaseNewsService, InvalidScraper
 from app.news_service.components.scraper import Scraper
 from app.news_service.types import HackernoonArticle
 
-from app.database.models.ai_news_service import Source
+from app.db.models.ai_news_service import Source
 from app.config import CONFIG
 
 
