@@ -24,6 +24,4 @@ async def get_session():
         except Exception as e:
             await session.rollback()
             raise e
-        finally:
-            await session.close()
 

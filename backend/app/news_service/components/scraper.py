@@ -5,6 +5,7 @@ from playwright.async_api import async_playwright
 from datetime import datetime, timedelta, timezone
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter
+from loguru import logger
 
 from app.news_service.components._playwright_scraper import run_playwright
 
@@ -56,7 +57,7 @@ class Scraper:
                     guid = entry.get("id", entry.get("link", ""))
                     if guid not in seen_guids:
                         all_entries.append(entry)
-        print("The total entries in given cutoff is : ", len(all_entries))
+        logger.info(f"Total entries in given cutoff is : {len(all_entries)}")
         return all_entries
 
     async def scrape_url(

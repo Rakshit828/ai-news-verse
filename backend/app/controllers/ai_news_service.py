@@ -4,7 +4,8 @@ from sqlalchemy.orm import aliased, selectinload, with_loader_criteria, joinedlo
 from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
-from datetime import datetime, timezone, time
+import uuid
+from datetime import datetime, timezone, time, timedelta
 
 
 from app.db.models.ai_news_service import Articles, Source
@@ -190,7 +191,6 @@ class CategoriesDBService(BaseDBInteractions):
         result = (await session.execute(statement)).scalars().all()
         return result if result else None
 
-
     async def get_category_column(
         self, column: Literal["category_id", "title"], session: AsyncSession
     ) -> List[str] | None:
@@ -206,7 +206,6 @@ class CategoriesDBService(BaseDBInteractions):
                 )
         result = (await session.execute(statement=statement)).scalars().all()
         return result if result else None
-
 
     async def filter_not_existing_categories(
         self, categories_id: List[str], session: AsyncSession
@@ -691,6 +690,27 @@ class NewsDBService:
             hackernoon=hackernoon_articles,
         )
         return today_news_response
+    
+
+    async def get_records_for_pinecone(
+        self,
+        session: AsyncSession,
+    ) -> List[dict]:
+        records = []
+        statement = select(Articles.title, Articles.category_id, Articles.subcategory_id)
+        result = await session.execute(statement)
+        rows = result.all()
+        for row in rows:
+            records.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "title": row[0],
+                    "category": row[1],
+                    "subcategory": row[2],
+                }
+            )
+        return records
+
 
     async def create_article(
         self,
@@ -712,6 +732,7 @@ class NewsDBService:
         await session.commit()
         return True
 
+
     async def check_guid(self, guid: str, source: str, session: AsyncSession):
         """Check the existence of guid of articles object."""
         statement = select(Articles).where(
@@ -720,10 +741,20 @@ class NewsDBService:
         result = await session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def get_all_guids(self, source: str, session: AsyncSession):
-        """Returns all the guids associated with the category."""
-        statement = select(Articles.guid).where(Articles.source == source)
-        result = session.execute(statement)
+
+    async def get_all_guids(
+        self, session: AsyncSession, source: str, cutoff_hours: int | None = 24
+    ) -> list[str]:
+        """Returns all the guids associated with the category on the given cutoff hours. It returns all the guids if cutoff hour is None."""
+        if cutoff_hours is None:
+            statement = select(Articles.guid).where(Articles.source == source)
+        else:
+            now = datetime.now(timezone.utc)
+            cutoff_time = now - timedelta(hours=cutoff_hours)
+            statement = select(Articles.guid).where(
+                Articles.source == source, Articles.published_on >= cutoff_time
+            )
+        result = await session.execute(statement)
         return result.scalars().all()
 
 
