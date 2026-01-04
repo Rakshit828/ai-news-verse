@@ -69,7 +69,7 @@ htmlcov/
 
 # Environment files
 .env
-.env.*.local
+.env.dev
 
 # OS
 .DS_Store
