@@ -1,19 +1,18 @@
-import groq
 import json
 from loguru import logger
+from pydantic import BaseModel
+from app.ai.llms import UseLLMsGroq, GroqModelEnum
 
-from app.config import CONFIG
 
-
-class NewsTitles:
-    category: str
+class NewsTitles(BaseModel):
     titles: list[str]
 
+
 class NewsTitleGenerator:
-    PROMPT = """
+    NEWS_TITLE_GENERATION_PROMPT = """
     You are expert dummy but realistic data generator in the field of AI. You will be given with an
-    AI related topic. Generate {number} news titles with resembles the given AI topic. It should be in
-    the following format. 
+    AI related topic. Generate {number} news titles with resembles the given AI topic. Give diverse news titles.
+    It should be in the following format. 
 
     Topic:
     {topic}
@@ -26,41 +25,32 @@ class NewsTitleGenerator:
     Just json string parsable using python.
     """
 
-    def __init__(self, groq_client: groq.Groq = None):
-        self.client: groq.Groq = (
-            groq_client if groq_client else groq.Groq(api_key=CONFIG.GROQ_API_KEY)
+    def __init__(self, groq_client: UseLLMsGroq = None):
+        self._client: UseLLMsGroq = (
+            groq_client
+            if groq_client
+            else UseLLMsGroq(default_model=GroqModelEnum.GPT_OSS_120B)
         )
-
-
 
     async def generate_news_titles(
-        self, topic: str, number: int = 20
+        self,
+        topic: str,
+        number: int = 20,
+        model: GroqModelEnum = GroqModelEnum.GPT_OSS_120B,
+        temperature: float = 0.9,
     ) -> NewsTitles:
-        """Returns the ai generated news titles from given topic.
-        """
+        """Returns the ai generated news titles from given topic."""
 
-        prompt = self.PROMPT.format(
-            topic=topic, number=number
-        )
+        prompt = self.NEWS_TITLE_GENERATION_PROMPT.format(topic=topic, number=number)
         try:
-            chat_completion = self.client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-                model="openai/gpt-oss-120b",  # llama-3.3-70b-versatile,
+            result = await self._client.chat_completion(
+                prompt=prompt, model=model, temperature=temperature
             )
-            print("AI : ", chat_completion.choices[0].message.content)
-            classified_response = json.loads(chat_completion.choices[0].message.content)
+            news_titles_response = json.loads(result)
 
-        except groq._exceptions.RateLimitError as e:
-            logger.error("Rate limit reaced for groq", str(e))
-            raise groq.RateLimitError()
+        except json.JSONDecodeError as exc:
+            logger.error("LLM is not able to produce JSON serializable response.")
+            raise exc
 
-        except json.JSONDecodeError:
-            raise ValueError("Unable to decode the json")
-
-        result = NewsTitles(**classified_response)
+        result = NewsTitles(**news_titles_response)
         return result

@@ -3,7 +3,6 @@ from pinecone.db_data.index_asyncio import _IndexAsyncio
 from pinecone.exceptions.exceptions import PineconeApiException
 from typing import List, TypedDict, Dict, Generator
 from loguru import logger
-import asyncio as aio
 from itertools import islice
 
 from app.config import CONFIG
@@ -38,8 +37,27 @@ class PineconeClient:
         index = client.IndexAsyncio(host=host)
         return cls(index)
 
-    async def upsert_records(self, records: List[TitleCategoryRecord]):
+    async def check_for_subcategory_existence(self, subcategory: str) -> bool:
+        async with self.index as idx:
+            try:
+                result = await idx.search(
+                    namespace=self.NAMESPACES.get(
+                        "title-category-namespace", "title-category-namespace  "
+                    ),
+                    query={
+                        "inputs": {"text": f"{subcategory}"}, 
+                        "top_k": 1,
+                        "filter": {"subcategory": subcategory},
+                    },
+                    fields=["subcategory"]
+                )
+                subcategory = result['result']['hits'][0]['fields']['subcategory']
+                return subcategory == subcategory
+            
+            except PineconeApiException as exc:
+                raise exc
 
+    async def upsert_records(self, records: List[TitleCategoryRecord]):
         async with self.index as idx:
             try:
                 logger.info(f"Upserting {len(records)} records to pinecone")
