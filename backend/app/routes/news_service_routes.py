@@ -16,6 +16,8 @@ from app.db.main import get_session
 from app.response import SuccessResponse
 from loguru import logger
 
+from app.ai.pipeline.news_title_classification import TitleClassifier
+
 
 news_routes = APIRouter()
 
@@ -23,6 +25,10 @@ category_service = CategoriesDBService()
 news_service = NewsDBService()
 
 
+@news_routes.get("/classify/{title}")
+async def get_news_classification(title: str):
+    classifier = await TitleClassifier.create()
+    return await classifier.run_pipeline(title)
 
 
 @news_routes.post(

@@ -1,7 +1,7 @@
 import json
 from loguru import logger
 from pydantic import BaseModel
-from app.ai.llms import UseLLMsGroq, GroqModelEnum
+from backend.app.ai.components.llms import UseLLMsGroq, GroqModelEnum
 
 
 class NewsTitles(BaseModel):

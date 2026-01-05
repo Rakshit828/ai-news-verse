@@ -3,7 +3,8 @@
 import asyncio
 from loguru import logger
 
-from app.ai.pinecone_db import init_pinecone_db, PineconeClient, TitleCategoryRecord
+from app.ai.components.pinecone_db import init_pinecone_db, PineconeClient
+from app.ai.models import TitleCategoryRecord
 from app.repository import init_repository, NewsRepository
 from app.db.main import get_session
 

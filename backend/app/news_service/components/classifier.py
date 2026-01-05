@@ -4,7 +4,7 @@ from loguru import logger
 from typing import Optional
 
 from app.news_service.types import CategoriesData, ClassifiedCategory
-from app.ai.llms import UseLLMsGroq, GroqModelEnum
+from backend.app.ai.components.llms import UseLLMsGroq, GroqModelEnum
 
 
 class CategoryClassifier:

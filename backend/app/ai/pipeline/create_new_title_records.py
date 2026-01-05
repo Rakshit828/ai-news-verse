@@ -5,8 +5,9 @@ import uuid
 import asyncio as aio
 from loguru import logger
 
-from app.ai.news_title_generator import NewsTitleGenerator, NewsTitles
-from app.ai.pinecone_db import PineconeClient, TitleCategoryRecord, init_pinecone_db
+from app.ai.components.news_title_generator import NewsTitleGenerator, NewsTitles
+from app.ai.components.pinecone_db import PineconeClient, init_pinecone_db
+from app.ai.models import TitleCategoryRecord
 
 
 class CreateNewTitleRecordsPipeline:
