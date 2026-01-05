@@ -1,53 +1,66 @@
 from pydantic import BaseModel
 from typing import Optional, List, Tuple
+from uuid import UUID
 
+
+
+# Response for all category related tasks
 class SubCategoryModel(BaseModel):
-    subcategory_id: str
+    subcategory_id: UUID | str
     title: str
 
-class CategoryModel(BaseModel):
-    category_id: str
+class ResponseCategoryData(BaseModel):
+    category_id: UUID | str
     title: str
+    subcategories: Optional[List[SubCategoryModel]]
 
-class CreateSubcategoryModel(SubCategoryModel):
+class ResponseCategoryDataModel(BaseModel):
+    """Use when you need to give full category data response"""
+    categories: List[ResponseCategoryData]
+
+
+# For setting and updating the categories
+class SetCategoriesData(BaseModel):
+    category_id: UUID | str
+    subcategories: List[UUID | str]
+
+# Both classes are same but used for naming only 
+class SetUsersCategoriesModel(BaseModel):
+    """Use to set the users categories for first time."""
+    categories_data: List[SetCategoriesData]
+
+class UpdateUsersCategoriesModel(BaseModel):
+    """Use to update the users categories."""
+    categories_data: List[SetCategoriesData]
+
+
+
+class CreateCustomSubcategory(BaseModel):
+    title: str
     added_by_users: bool = True
 
-class CreateCategoryData(CategoryModel):
-    """Represents the full data of single category.
+
+class CreateCustomCategoryDataModel(BaseModel):
+    """Use to create a custom category with full data.
     ```json
         {
-            category_id: "ai_research",
             title: "AI Research",
             subcategories: [
-                { "id": "transformers", "title": "Transformers Research" }
+                { "title": "Transformers Research" }
             ]
         }
     ```
     """
-    subcategories: Optional[List[CreateSubcategoryModel]]
+    title: str
     added_by_users: bool = True
+    subcategories: Optional[List[CreateCustomSubcategory]]
 
-class AddSubcategoriesToCategoryModel(BaseModel):
-    category_id: str
-    subcategories: List[CreateSubcategoryModel]
+
+class CreateSubcategoriesToCategoryModel(BaseModel):
+    """Use when adding new subcategories to existing category."""
+    category_id: UUID | str
+    subcategories: List[CreateCustomSubcategory]
     
-# Response for all category related tasks
-class ResponseCategoryData(CategoryModel):
-    subcategories: Optional[List[SubCategoryModel]]
-
-
-# For setting and updating the categories
-class SetCategoryModel(BaseModel):
-    category_id: str
-    subcategories: List[str]
-
-# Both classes are same but used for naming only 
-class SetCategoriesUsers(BaseModel):
-    categories_data: List[SetCategoryModel]
-
-class UpdateCategoriesUsers(BaseModel):
-    categories_data: List[SetCategoryModel]
-
 
 
 

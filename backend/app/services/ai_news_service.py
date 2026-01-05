@@ -5,6 +5,7 @@ from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone, time, timedelta
 
 
@@ -16,24 +17,22 @@ from app.db.schemas import (
     Articles,
 )
 from app.db.main import get_session
-from app.news_service.types import CategoriesData
-from app.db.caching import category_caching
 from app.models.ai_news_service import (
     GoogleNewsResponse,
     AnthropicNewsResponse,
     HackernoonResponse,
     OpenaiNewsResponse,
     TodayNewsResponse,
+    ResponseCategoryDataModel,
+    SetUsersCategoriesModel,
+    UpdateUsersCategoriesModel,
+    CreateCustomCategoryDataModel,
+    CreateSubcategoriesToCategoryModel,
+
+    # Data types
+    SetCategoriesData
 )
-from app.models.ai_news_service import (
-    SetCategoryModel,
-    SetCategoriesUsers,
-    CreateSubcategoryModel,
-    UpdateCategoriesUsers,
-    CreateCategoryData,
-    TodayNewsResponse,
-    ResponseCategoryData,
-)
+
 from app.response import AppError
 from app.exceptions import (
     CategoryAlreadyExistsError,
@@ -137,48 +136,39 @@ class CategoriesDBService(BaseDBInteractions):
 
             await session.commit()
 
-    async def get_categories_data(self, session: AsyncSession) -> CategoriesData:
+    async def get_categories_data(self, session: AsyncSession) -> ResponseCategoryDataModel:
         """Returs the full category and subcategory data from the table except custom ones."""
-
-        cached_category_data = await category_caching.get_category_data()
-        if cached_category_data:
-            print("Returned from cache")
-            return CategoriesData(**cached_category_data)
-        else:
-            print("Returned from db")
-            category_data = {"categories": []}
-            statement = (
-                select(Category)
-                .where(Category.added_by_users == False)
-                .options(
-                    joinedload(Category.subcategories),
-                    with_loader_criteria(
-                        SubCategory,
-                        SubCategory.added_by_users == False,
-                        include_aliases=True,
-                    ),
-                )
+        category_data = {"categories": []}
+        statement = (
+            select(Category)
+            .where(Category.added_by_users == False)
+            .options(
+                joinedload(Category.subcategories),
+                with_loader_criteria(
+                    SubCategory,
+                    SubCategory.added_by_users == False,
+                    include_aliases=True,
+                ),
             )
-            result = await session.execute(statement)
-            categories = result.unique().scalars().all()
-            for category in categories:
-                single_cat_data = {
-                    "category_id": category.category_id,
-                    "title": category.title,
-                    "subcategories": [
-                        {
-                            "subcategory_id": subcategory.subcategory_id,
-                            "title": subcategory.title,
-                        }
-                        for subcategory in category.subcategories
-                    ],
-                }
+        )
+        result = await session.execute(statement)
+        categories = result.unique().scalars().all()
+        for category in categories:
+            single_cat_data = {
+                "category_id": category.category_id,
+                "title": category.title,
+                "subcategories": [
+                    {
+                        "subcategory_id": subcategory.subcategory_id,
+                        "title": subcategory.title,
+                    }
+                    for subcategory in category.subcategories
+                ],
+            }
 
-                category_data["categories"].append(single_cat_data)
+            category_data["categories"].append(single_cat_data)
 
-                await category_caching.set_category_data(category_data)
-
-            return CategoriesData(**category_data)
+        return ResponseCategoryDataModel(**category_data)
 
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "title"], session: AsyncSession
@@ -194,7 +184,7 @@ class CategoriesDBService(BaseDBInteractions):
 
     async def get_category_column(
         self, column: Literal["category_id", "title"], session: AsyncSession
-    ) -> List[str] | None:
+    ) -> List[UUID] | List[str] | None:
         """Returns all the ids of subcategories."""
         match (column):
             case "category_id":
@@ -210,7 +200,7 @@ class CategoriesDBService(BaseDBInteractions):
 
     async def filter_not_existing_categories(
         self, categories_id: List[str], session: AsyncSession
-    ) -> List[str] | None:
+    ) -> List[UUID] | List[str] | None:
         """Returns the category_id list from given category_ids which doesnn't exist in the db."""
         existing_categories: List[str] = await self.get_category_column(
             column="category_id", session=session
@@ -244,11 +234,10 @@ class CategoriesDBService(BaseDBInteractions):
     async def _add_existing_category_to_users(
         self,
         user_id: str,
-        categories_data: List[SetCategoryModel],
         category_ids: List[str],
         subcategory_ids: List[str],
         session: AsyncSession,
-    ) -> List[ResponseCategoryData]:
+    ) -> ResponseCategoryDataModel:
         """Function used internally by set and update user categories to set/update user categories."""
         if category_ids:
             not_existing_categories = await self.filter_not_existing_categories(
@@ -289,11 +278,11 @@ class CategoriesDBService(BaseDBInteractions):
     async def set_user_categories(
         self,
         user_id: str,
-        categories_data: SetCategoriesUsers,
+        categories_data: SetUsersCategoriesModel,
         session: AsyncSession,
-    ) -> List[ResponseCategoryData]:
+    ) -> ResponseCategoryDataModel:
 
-        categories_data: List[SetCategoryModel] = categories_data.categories_data
+        categories_data: List[SetCategoriesData] = categories_data.categories_data
         new_categories_id = [category.category_id for category in categories_data]
         new_subcategories_id = [
             subcategory_id
@@ -301,10 +290,9 @@ class CategoriesDBService(BaseDBInteractions):
             for subcategory_id in category.subcategories
         ]
 
-        user_categories: List[ResponseCategoryData] = (
+        user_categories: ResponseCategoryDataModel = (
             await self._add_existing_category_to_users(
                 user_id=user_id,
-                categories_data=categories_data,
                 category_ids=new_categories_id,
                 subcategory_ids=new_subcategories_id,
                 session=session,
@@ -315,10 +303,10 @@ class CategoriesDBService(BaseDBInteractions):
     async def update_user_categories(
         self,
         user_id: str,
-        categories_data: UpdateCategoriesUsers,
+        categories_data: UpdateUsersCategoriesModel,
         session: AsyncSession,
-    ) -> List[ResponseCategoryData]:
-        categories_data: List[SetCategoryModel] = categories_data.categories_data
+    ) -> ResponseCategoryDataModel:
+        categories_data: List[SetCategoriesData] = categories_data.categories_data
 
         # Get current user categories and subcategories
         current_user_subcategories: List[str] = await self.get_user_subcategories_id(
@@ -363,10 +351,9 @@ class CategoriesDBService(BaseDBInteractions):
                 user_id=user_id, category_id=category_id, session=session
             )
 
-        user_categories: List[ResponseCategoryData] = (
+        user_categories: ResponseCategoryDataModel = (
             await self._add_existing_category_to_users(
                 user_id=user_id,
-                categories_data=categories_data,
                 category_ids=list(categories_to_add),
                 subcategory_ids=list(subcategories_to_add),
                 session=session,
@@ -410,8 +397,8 @@ class CategoriesDBService(BaseDBInteractions):
         return True
 
     async def create_custom_category(
-        self, user_id: str, category_data: CreateCategoryData, session: AsyncSession
-    ) -> List[ResponseCategoryData]:
+        self, user_id: str, category_data: CreateCustomCategoryDataModel, session: AsyncSession
+    ) -> ResponseCategoryDataModel:
         """Allows users to create custom categories and subcategories within it."""
         category: Category | None = await self.get_category_by_id(
             id=category_data.category_id, session=session
@@ -476,9 +463,9 @@ class CategoriesDBService(BaseDBInteractions):
         self,
         user_id: str,
         category_id: str,
-        subcategories_data: List[CreateSubcategoryModel],
+        subcategories_data: List[CreateSubcategoriesToCategoryModel],
         session: AsyncSession,
-    ) -> List[ResponseCategoryData]:
+    ) -> ResponseCategoryDataModel:
         """Allows users to add new subcategories to an existing category."""
 
         # Check if category exists
@@ -564,7 +551,7 @@ class CategoriesDBService(BaseDBInteractions):
 
     async def get_user_categories(
         self, user_id: str, session: AsyncSession
-    ) -> List[ResponseCategoryData]:
+    ) -> List[ResponseCategoryDataModel]:
         """Returns all the categories of the user and the subcategory in structured format."""
         subq_categories = (
             select(UserCategory).where(UserCategory.user_id == user_id).subquery()
@@ -591,8 +578,8 @@ class CategoriesDBService(BaseDBInteractions):
             statement=stmt_subcategories, session=session, to="rows"
         )
 
-        category_data: List[ResponseCategoryData] = [
-            ResponseCategoryData(
+        category_data: List[ResponseCategoryDataModel] = [
+            ResponseCategoryDataModel(
                 **{
                     "category_id": category_row[0],
                     "title": category_row[1],
@@ -606,7 +593,6 @@ class CategoriesDBService(BaseDBInteractions):
             for category_row in user_categories
         ]
         return category_data
-
 
 
 

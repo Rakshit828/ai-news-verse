@@ -95,7 +95,7 @@ class UserCategory(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.uuid", ondelete="CASCADE"), primary_key=True
     )
-    category_id: Mapped[str] = mapped_column(
+    category_id: Mapped[UUID] = mapped_column(
         ForeignKey("news_categories.category_id", ondelete="CASCADE"), primary_key=True
     )
 
@@ -106,7 +106,7 @@ class UserSubCategory(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.uuid", ondelete="CASCADE"), primary_key=True
     )
-    subcategory_id: Mapped[str] = mapped_column(
+    subcategory_id: Mapped[UUID] = mapped_column(
         ForeignKey("news_subcategories.subcategory_id", ondelete="CASCADE"), primary_key=True
     )
 
