@@ -3,15 +3,15 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 from typing import List
 
 from app.auth.dependencies import AccessTokenBearer
-from app.schemas.ai_news_service import (
+from app.models.ai_news_service import (
     SetCategoriesUsers,
     UpdateCategoriesUsers,
     CreateCategoryData,
     TodayNewsResponse,
     ResponseCategoryData,
-    AddSubcategoriesToCategorySchema,
+    AddSubcategoriesToCategoryModel,
 )
-from app.controllers.ai_news_service import NewsDBService, CategoriesDBService
+from app.services.ai_news_service import NewsDBService, CategoriesDBService
 from app.db.main import get_session
 from app.response import SuccessResponse
 from loguru import logger
@@ -24,11 +24,6 @@ news_routes = APIRouter()
 category_service = CategoriesDBService()
 news_service = NewsDBService()
 
-
-@news_routes.get("/classify/{title}")
-async def get_news_classification(title: str):
-    classifier = await TitleClassifier.create()
-    return await classifier.run_pipeline(title)
 
 
 @news_routes.post(
@@ -108,10 +103,10 @@ async def create_own_category(
 
 
 @news_routes.post(
-    "/add-subcategories", response_model=SuccessResponse[List[ResponseCategoryData]]
+    "/add-subcategories", response_model=SuccessResponse[List[ResponseCategoryData]], description="Allows the users to add new subcategories to the existing category."
 )
 async def add_subcategories_to_category(
-    payload: AddSubcategoriesToCategorySchema,
+    payload: AddSubcategoriesToCategoryModel,
     decoded_token=Depends(AccessTokenBearer()),
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[List[ResponseCategoryData]]:

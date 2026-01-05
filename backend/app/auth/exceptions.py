@@ -2,10 +2,10 @@ from fastapi import status
 from app.response import ErrorResponse, T
 
 
-class InvalidTokenSchemaError(ErrorResponse[T]):
+class InvalidTokenModelError(ErrorResponse[T]):
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
     status: str = "error"
-    error: str = "invalid_token_schema_error"
+    error: str = "invalid_token_model_error"
     message: str = "Given dictionary is invalid for the tokens setup in cookies"
     data: T | None = None
  

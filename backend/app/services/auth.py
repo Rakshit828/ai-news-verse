@@ -13,8 +13,8 @@ from app.auth.exceptions import (
     EmailAlreadyExistsError,
     EmailNotFoundError
 )
-from app.db.models.core import Users
-from app.schemas.auth import UserCreateSchema, UserLogInSchema
+from app.db.schemas import Users
+from app.models.auth import UserCreateModel, UserLogInModel
 
 
 
@@ -66,7 +66,7 @@ class AuthService:
         await session.commit()
         return
 
-    async def log_in_user(self, user_data: UserLogInSchema, session: AsyncSession):
+    async def log_in_user(self, user_data: UserLogInModel, session: AsyncSession):
         """Verifies the user and issues both the Access and Refresh Tokens"""
 
         user_data_dict = user_data.model_dump()
@@ -89,7 +89,7 @@ class AuthService:
         tokens = await create_jwt_tokens(user_uuid=uuid, role=role, is_login=True)
         return tokens
 
-    async def make_account(self, user_data: UserCreateSchema, session: AsyncSession):
+    async def make_account(self, user_data: UserCreateModel, session: AsyncSession):
         """Creates the user account on the database"""
         user_data_dict = user_data.model_dump()
 

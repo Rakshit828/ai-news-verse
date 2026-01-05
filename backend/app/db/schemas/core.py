@@ -4,6 +4,7 @@ from typing import List
 from sqlalchemy import String, text, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import sqlalchemy.dialects.postgresql as pg
+import uuid
 
 from ..main import Base
 
@@ -14,6 +15,7 @@ class Users(Base):
     uuid: Mapped[UUID] = mapped_column(
         pg.UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4(),
         server_default=text("gen_random_uuid()"),
     )
 
@@ -41,7 +43,12 @@ class Users(Base):
 class Category(Base):
     __tablename__ = "news_categories"
 
-    category_id: Mapped[str] = mapped_column(pg.VARCHAR(50), primary_key=True)
+    category_id: Mapped[UUID] = mapped_column(
+        pg.UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4(),
+        server_default=text("gen_random_uuid()"),
+    )
     title: Mapped[str] = mapped_column(pg.VARCHAR(50), nullable=False)
     added_by_users: Mapped[bool] = mapped_column(pg.BOOLEAN, server_default=text("false"), nullable=False)
 
@@ -59,7 +66,12 @@ class Category(Base):
 class SubCategory(Base):
     __tablename__ = "news_subcategories"
 
-    subcategory_id: Mapped[str] = mapped_column(pg.VARCHAR(50), primary_key=True)
+    subcategory_id: Mapped[UUID] = mapped_column(
+        pg.UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4(),
+        server_default=text("gen_random_uuid()"),
+    )
     title: Mapped[str] = mapped_column(pg.VARCHAR(50), nullable=False)
     added_by_users: Mapped[bool] = mapped_column(pg.BOOLEAN, server_default=text("false"), nullable=False)
 

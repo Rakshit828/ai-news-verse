@@ -1,0 +1,1 @@
+"""This folder defines the main business logic of the application."""

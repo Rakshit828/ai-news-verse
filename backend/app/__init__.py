@@ -82,3 +82,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 app.include_router(news_routes, tags=["News"], prefix=f"/api/{VERSION}/news")
 app.include_router(auth_routes, tags=["Authentication"], prefix=f"/api/{VERSION}/auth")
+
+
+

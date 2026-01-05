@@ -3,19 +3,19 @@ from uuid import UUID
 from datetime import datetime
 
 
-class UserCreateSchema(BaseModel):
+class UserCreateModel(BaseModel):
     first_name: str = Field(alias='firstName')
     last_name: str = Field(alias='lastName')
     email: EmailStr 
     password: str  = Field(min_length=8)
 
 
-class UserLogInSchema(BaseModel):
+class UserLogInModel(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=40)
 
 
-class UserResponseSchema(BaseModel):
+class UserResponseModel(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
@@ -25,15 +25,15 @@ class UserResponseSchema(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
 
-class RegisterAccountResponseSchema(BaseModel):
-    data: UserResponseSchema
+class RegisterAccountResponseModel(BaseModel):
+    data: UserResponseModel
     message: str
 
-class TokensSchema(BaseModel):
+class TokensModel(BaseModel):
     access_token: str
     refresh_token: str
 
 
-class AccessTokenSchema(BaseModel):
+class AccessTokenModel(BaseModel):
     access_token: str
 

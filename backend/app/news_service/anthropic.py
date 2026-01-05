@@ -8,7 +8,7 @@ from app.news_service.types import (
 from app.news_service._base import BaseNewsService
 from app.news_service.components.scraper import Scraper
 
-from app.db.models.ai_news_service import Source
+from app.db.schemas.ai_news_service import Source
 
 
 class InvalidScraper(Exception):

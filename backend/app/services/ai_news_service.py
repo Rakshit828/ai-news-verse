@@ -1,6 +1,6 @@
 from sqlalchemy import select, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, selectinload, with_loader_criteria, joinedload
+from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
 from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
@@ -8,27 +8,27 @@ import uuid
 from datetime import datetime, timezone, time, timedelta
 
 
-from app.db.models.ai_news_service import Articles, Source
-from app.db.models.core import (
+from app.db.schemas import (
     Category,
     SubCategory,
     UserCategory,
     UserSubCategory,
+    Articles,
 )
 from app.db.main import get_session
 from app.news_service.types import CategoriesData
-from app.controllers.caching import category_caching
-from app.schemas.ai_news_service import (
+from app.db.caching import category_caching
+from app.models.ai_news_service import (
     GoogleNewsResponse,
     AnthropicNewsResponse,
     HackernoonResponse,
     OpenaiNewsResponse,
     TodayNewsResponse,
 )
-from app.schemas.ai_news_service import (
-    SetCategorySchema,
+from app.models.ai_news_service import (
+    SetCategoryModel,
     SetCategoriesUsers,
-    CreateSubcategorySchema,
+    CreateSubcategoryModel,
     UpdateCategoriesUsers,
     CreateCategoryData,
     TodayNewsResponse,
@@ -95,46 +95,47 @@ class BaseDBInteractions:
 class CategoriesDBService(BaseDBInteractions):
     @staticmethod
     async def _initialize_categories(session: AsyncSession):
+
         with open(
-            r"D:\GenAI\AiNewsSystem\backend\app\db\models\_category.json",
+            r"D:\GenAI\AiNewsSystem\backend\app\db\schemas\_category.json",
             "r",
             encoding="utf-8",
         ) as f:
             categories_data = json.load(f)["categories"]
 
-        category_rows = []
-        subcategory_rows = []
+            category_rows = []
+            subcategory_rows = []
 
-        for category in categories_data:
-            category_rows.append(
-                {
-                    "category_id": category["id"],
-                    "title": category["title"],
-                }
-            )
-
-            for sub in category["subcategories"]:
-                subcategory_rows.append(
+            for category in categories_data:
+                category_rows.append(
                     {
-                        "subcategory_id": sub["id"],
-                        "title": sub["title"],
-                        "category_id": category["id"],
+                        "uuid": category["uuid"],
+                        "title": category["title"],
                     }
                 )
 
-        if category_rows:
-            await session.execute(
-                insert(Category),
-                category_rows,
-            )
+                for sub in category["subcategories"]:
+                    subcategory_rows.append(
+                        {
+                            "uuid": sub["uuid"],
+                            "title": sub["title"],
+                            "category_id": category["uuid"],
+                        }
+                    )
 
-        if subcategory_rows:
-            await session.execute(
-                insert(SubCategory),
-                subcategory_rows,
-            )
+            if category_rows:
+                await session.execute(
+                    insert(Category),
+                    category_rows,
+                )
 
-        await session.commit()
+            if subcategory_rows:
+                await session.execute(
+                    insert(SubCategory),
+                    subcategory_rows,
+                )
+
+            await session.commit()
 
     async def get_categories_data(self, session: AsyncSession) -> CategoriesData:
         """Returs the full category and subcategory data from the table except custom ones."""
@@ -243,7 +244,7 @@ class CategoriesDBService(BaseDBInteractions):
     async def _add_existing_category_to_users(
         self,
         user_id: str,
-        categories_data: List[SetCategorySchema],
+        categories_data: List[SetCategoryModel],
         category_ids: List[str],
         subcategory_ids: List[str],
         session: AsyncSession,
@@ -292,7 +293,7 @@ class CategoriesDBService(BaseDBInteractions):
         session: AsyncSession,
     ) -> List[ResponseCategoryData]:
 
-        categories_data: List[SetCategorySchema] = categories_data.categories_data
+        categories_data: List[SetCategoryModel] = categories_data.categories_data
         new_categories_id = [category.category_id for category in categories_data]
         new_subcategories_id = [
             subcategory_id
@@ -317,7 +318,7 @@ class CategoriesDBService(BaseDBInteractions):
         categories_data: UpdateCategoriesUsers,
         session: AsyncSession,
     ) -> List[ResponseCategoryData]:
-        categories_data: List[SetCategorySchema] = categories_data.categories_data
+        categories_data: List[SetCategoryModel] = categories_data.categories_data
 
         # Get current user categories and subcategories
         current_user_subcategories: List[str] = await self.get_user_subcategories_id(
@@ -475,7 +476,7 @@ class CategoriesDBService(BaseDBInteractions):
         self,
         user_id: str,
         category_id: str,
-        subcategories_data: List[CreateSubcategorySchema],
+        subcategories_data: List[CreateSubcategoryModel],
         session: AsyncSession,
     ) -> List[ResponseCategoryData]:
         """Allows users to add new subcategories to an existing category."""
@@ -607,6 +608,8 @@ class CategoriesDBService(BaseDBInteractions):
         return category_data
 
 
+
+
 class NewsDBService:
 
     def __init__(self, category_service: CategoriesDBService | None = None):
@@ -690,14 +693,15 @@ class NewsDBService:
             hackernoon=hackernoon_articles,
         )
         return today_news_response
-    
 
     async def get_records_for_pinecone(
         self,
         session: AsyncSession,
     ) -> List[dict]:
         records = []
-        statement = select(Articles.title, Articles.category_id, Articles.subcategory_id)
+        statement = select(
+            Articles.title, Articles.category_id, Articles.subcategory_id
+        )
         result = await session.execute(statement)
         rows = result.all()
         for row in rows:
@@ -710,7 +714,6 @@ class NewsDBService:
                 }
             )
         return records
-
 
     async def create_article(
         self,
@@ -732,7 +735,6 @@ class NewsDBService:
         await session.commit()
         return True
 
-
     async def check_guid(self, guid: str, source: str, session: AsyncSession):
         """Check the existence of guid of articles object."""
         statement = select(Articles).where(
@@ -740,7 +742,6 @@ class NewsDBService:
         )
         result = await session.execute(statement)
         return result.scalar_one_or_none()
-
 
     async def get_all_guids(
         self, session: AsyncSession, source: str, cutoff_hours: int | None = 24

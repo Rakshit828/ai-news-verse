@@ -1,22 +1,22 @@
 from pydantic import BaseModel
 from typing import Optional, List, Tuple
 
-class SubCategorySchema(BaseModel):
+class SubCategoryModel(BaseModel):
     subcategory_id: str
     title: str
 
-class CategorySchema(BaseModel):
+class CategoryModel(BaseModel):
     category_id: str
     title: str
 
-class CreateSubcategorySchema(SubCategorySchema):
+class CreateSubcategoryModel(SubCategoryModel):
     added_by_users: bool = True
 
-class CreateCategoryData(CategorySchema):
+class CreateCategoryData(CategoryModel):
     """Represents the full data of single category.
     ```json
         {
-            category_id: "ai_esearch",
+            category_id: "ai_research",
             title: "AI Research",
             subcategories: [
                 { "id": "transformers", "title": "Transformers Research" }
@@ -24,29 +24,29 @@ class CreateCategoryData(CategorySchema):
         }
     ```
     """
-    subcategories: Optional[List[CreateSubcategorySchema]]
+    subcategories: Optional[List[CreateSubcategoryModel]]
     added_by_users: bool = True
 
-class AddSubcategoriesToCategorySchema(BaseModel):
+class AddSubcategoriesToCategoryModel(BaseModel):
     category_id: str
-    subcategories: List[CreateSubcategorySchema]
+    subcategories: List[CreateSubcategoryModel]
     
 # Response for all category related tasks
-class ResponseCategoryData(CategorySchema):
-    subcategories: Optional[List[SubCategorySchema]]
+class ResponseCategoryData(CategoryModel):
+    subcategories: Optional[List[SubCategoryModel]]
 
 
 # For setting and updating the categories
-class SetCategorySchema(BaseModel):
+class SetCategoryModel(BaseModel):
     category_id: str
     subcategories: List[str]
 
 # Both classes are same but used for naming only 
 class SetCategoriesUsers(BaseModel):
-    categories_data: List[SetCategorySchema]
+    categories_data: List[SetCategoryModel]
 
 class UpdateCategoriesUsers(BaseModel):
-    categories_data: List[SetCategorySchema]
+    categories_data: List[SetCategoryModel]
 
 
 

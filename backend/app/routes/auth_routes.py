@@ -4,25 +4,25 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from app.db.main import get_session
 from app.config import CONFIG
-from app.controllers.auth import AuthService
+from app.services.auth import AuthService
 from app.auth.dependencies import RefreshTokenBearer
 from app.auth.utils import create_jwt_tokens
-from app.schemas.auth import (
-    UserCreateSchema,
-    UserResponseSchema,
-    UserLogInSchema,
+from app.models.auth import (
+    UserCreateModel,
+    UserResponseModel,
+    UserLogInModel,
 )
 from app.response import AppError, SuccessResponse
-from app.auth.exceptions import InvalidTokenSchemaError
+from app.auth.exceptions import InvalidTokenModelError
 
 
 def set_tokens_dev(response: Response, tokens_dict: dict[str, str]):
     token_keys: set[str] = { "access_token", "refresh_token" }
     if not tokens_dict.keys():
-        raise AppError(InvalidTokenSchemaError(message="Empty token schema in setting of the tokens in cookies."))
+        raise AppError(InvalidTokenModelError(message="Empty token Model in setting of the tokens in cookies."))
     for key in tokens_dict.keys():
         if key not in token_keys:
-            raise AppError(InvalidTokenSchemaError(message=f"Invalid token schema : Schema is {tokens_dict}"))
+            raise AppError(InvalidTokenModelError(message=f"Invalid token Model : Model is {tokens_dict}"))
         response.set_cookie(
             path="/",
             key=key,
@@ -36,10 +36,10 @@ def set_tokens_dev(response: Response, tokens_dict: dict[str, str]):
 def set_tokens_production(response: Response, tokens_dict: dict[str, str]):
     token_keys: set[str] = { "access_token", "refresh_token" }
     if not tokens_dict.keys():
-        raise AppError(InvalidTokenSchemaError(message="Empty token schema in setting of the tokens in cookies."))
+        raise AppError(InvalidTokenModelError(message="Empty token Model in setting of the tokens in cookies."))
     for key in tokens_dict.keys():
         if key not in token_keys:
-            raise AppError(InvalidTokenSchemaError(message=f"Invalid token schema : Schema is {tokens_dict}"))
+            raise AppError(InvalidTokenModelError(message=f"Invalid token Model : Model is {tokens_dict}"))
         response.set_cookie(
             path="/",
             key=key,
@@ -59,25 +59,25 @@ auth_service = AuthService()
 
 @auth_routes.post(
     "/signup",
-    response_model=SuccessResponse[UserResponseSchema],
+    response_model=SuccessResponse[UserResponseModel],
     status_code=status.HTTP_201_CREATED,
 )
 async def create_account(
-    user_data: UserCreateSchema,
+    user_data: UserCreateModel,
     session: AsyncSession = Depends(get_session),
-) -> SuccessResponse[UserResponseSchema]:
+) -> SuccessResponse[UserResponseModel]:
     user = await auth_service.make_account(user_data=user_data, session=session)
-    return SuccessResponse[UserResponseSchema](
+    return SuccessResponse[UserResponseModel](
         status_code=status.HTTP_201_CREATED,
         message="Account Created Successfully",
         data=user.__dict__,
     )
 
 
-@auth_routes.post("/login", response_model=SuccessResponse[UserResponseSchema])
+@auth_routes.post("/login", response_model=SuccessResponse[UserResponseModel])
 async def login(
     response: Response,
-    user_data: UserLogInSchema,
+    user_data: UserLogInModel,
     session: AsyncSession = Depends(get_session),
 ):
     tokens = await auth_service.log_in_user(user_data, session)
@@ -86,7 +86,7 @@ async def login(
     else:
         set_tokens_production(response=response, tokens_dict=tokens)
     user = await auth_service.get_user_by_email(email=user_data.email, session=session)
-    return SuccessResponse[UserResponseSchema](
+    return SuccessResponse[UserResponseModel](
         message="Logged In Successfully.",
         status_code=status.HTTP_200_OK,
         data=user.__dict__
