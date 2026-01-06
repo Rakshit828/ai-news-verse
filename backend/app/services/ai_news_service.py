@@ -1,6 +1,7 @@
 from sqlalchemy import select, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
@@ -24,13 +25,13 @@ from app.models.ai_news_service import (
     OpenaiNewsResponse,
     TodayNewsResponse,
     ResponseCategoryDataModel,
+    ResponseCategoryData,
     SetUsersCategoriesModel,
     UpdateUsersCategoriesModel,
     CreateCustomCategoryDataModel,
     CreateSubcategoriesToCategoryModel,
-
     # Data types
-    SetCategoriesData
+    SetCategoriesData,
 )
 
 from app.response import AppError
@@ -136,7 +137,9 @@ class CategoriesDBService(BaseDBInteractions):
 
             await session.commit()
 
-    async def get_categories_data(self, session: AsyncSession) -> ResponseCategoryDataModel:
+    async def get_categories_data(
+        self, session: AsyncSession
+    ) -> ResponseCategoryDataModel:
         """Returs the full category and subcategory data from the table except custom ones."""
         category_data = {"categories": []}
         statement = (
@@ -283,12 +286,14 @@ class CategoriesDBService(BaseDBInteractions):
     ) -> ResponseCategoryDataModel:
 
         categories_data: List[SetCategoriesData] = categories_data.categories_data
-        new_categories_id = [category.category_id for category in categories_data]
-        new_subcategories_id = [
-            subcategory_id
-            for category in categories_data
-            for subcategory_id in category.subcategories
-        ]
+
+        new_categories_id = []
+        new_subcategories_id = []
+
+        for category in categories_data:
+            new_categories_id.append(category.category_id)
+            for subcategory_id in category.subcategories:
+                new_subcategories_id.append(subcategory_id)
 
         user_categories: ResponseCategoryDataModel = (
             await self._add_existing_category_to_users(
@@ -397,137 +402,142 @@ class CategoriesDBService(BaseDBInteractions):
         return True
 
     async def create_custom_category(
-        self, user_id: str, category_data: CreateCustomCategoryDataModel, session: AsyncSession
+        self,
+        user_id: str,
+        category_data: CreateCustomCategoryDataModel,
+        session: AsyncSession,
     ) -> ResponseCategoryDataModel:
         """Allows users to create custom categories and subcategories within it."""
-        category: Category | None = await self.get_category_by_id(
-            id=category_data.category_id, session=session
+        category = Category(
+            category_id=category_data.uuid,
+            title=category_data.title,
+            added_by_users=True,
         )
-        if category is not None:
-            raise AppError(
-                CategoryAlreadyExistsError(
-                    message=f"Category: '{category_data.title}' already exists"
+        async with session.begin():
+            try:
+                session.add(category)
+                session.flush()
+            except IntegrityError as exc:
+                raise AppError(
+                    CategoryAlreadyExistsError(
+                        message=f"Category: '{category_data.title}' already exists"
+                    )
                 )
-            )
-        subcategories_id = [
-            subcategory.subcategory_id for subcategory in category_data.subcategories
-        ]
-        not_existing_subcategories = await self.filter_not_existing_subcategories(
-            subcategories_id=subcategories_id, session=session
-        )
-        # If it is None, it means all the subcategories already exists
-        if not_existing_subcategories is None:
-            raise AppError(
-                SubCategoryAlreadyExistsError(
-                    message=f"Subcategories '{', '.join(subcategories_id)}' already exist"
-                )
-            )
-        already_existing_subcategories = set(subcategories_id) - set(
-            not_existing_subcategories
-        )
-        if already_existing_subcategories:
-            raise AppError(
-                SubCategoryAlreadyExistsError(
-                    message=f"Subcategories '{', '.join(already_existing_subcategories)}' already exist"
-                )
-            )
-        # Checks for category and subcategory for existence is done
 
-        category_data_dict = category_data.model_dump()
-        del category_data_dict["subcategories"]
-        category_orm: Category = Category(**category_data_dict)
-        category_orm.subcategories = [
-            SubCategory(**subcategory.model_dump())
-            for subcategory in category_data.subcategories
-        ]
-        session.add(category_orm)
+            user_category_orm = UserCategory(
+                user_id=user_id, category_id=category_data.uuid
+            )
 
-        # Addition of new category and subcategories done. Now, liking it with the users
-        user_category = UserCategory(
-            user_id=user_id, category_id=category_data.category_id
-        )
-        session.add(user_category)
+            session.add(user_category_orm)
 
-        if category_data.subcategories:
-            user_subcategories = [
-                UserSubCategory(
-                    user_id=user_id, subcategory_id=subcategory.subcategory_id
+            subcategories_title = {s.title for s in category_data.subcategories}
+            if subcategories_title:
+                existing_titles = set(
+                    await session.scalars(
+                        statement=select(SubCategory.title).where(
+                            SubCategory.title.in_(subcategories_title)
+                        )
+                    )
                 )
-                for subcategory in category_data.subcategories
-            ]
-            session.add_all(user_subcategories)
-        await session.commit()
-        return await self.get_user_categories(user_id=user_id, session=session)
+                if existing_titles:
+                    raise AppError(
+                        SubCategoryAlreadyExistsError(
+                            message=f"Subcategories '{', '.join(existing_titles)}' already exist"
+                        )
+                    )
+
+                subcategories_orm = []
+                user_subcategories_orm = []
+
+                for subcat in category_data.subcategories:
+                    subcategories_orm.append(
+                        SubCategory(
+                            subcategory_id=subcat.uuid,
+                            title=subcat.title,
+                            added_by_users=True,
+                            category_id=category_data.uuid,
+                        )
+                    )
+                    user_subcategories_orm.append(
+                        UserSubCategory(user_id=user_id, subcategory_id=subcat.uuid)
+                    )
+
+                    session.add_all(subcategories_orm)
+                    session.add_all(user_subcategories_orm)
+
+            await session.commit()
+
+        category_data_response: ResponseCategoryDataModel = (
+            await self.get_user_categories(user_id=user_id, session=session)
+        )
+
+        # Running the background tasks is remaining to initialize new records in pinecone
+
+        return category_data_response
 
     async def add_subcategories_to_existing_category(
         self,
         user_id: str,
-        category_id: str,
-        subcategories_data: List[CreateSubcategoriesToCategoryModel],
+        categories_data: CreateSubcategoriesToCategoryModel,
         session: AsyncSession,
     ) -> ResponseCategoryDataModel:
         """Allows users to add new subcategories to an existing category."""
+        category_id: UUID = categories_data.category_id
+        subcategories_title = [subcategory.title for subcategory in categories_data.subcategories]
 
-        # Check if category exists
-        category = await self.get_category_by_id(id=category_id, session=session)
-        if category is None:
-            raise AppError(
-                CategoryNotFoundError(message=f"Category: '{category_id}' not found.")
+        async with session.begin():
+            # Check if user owns this category (has it in their user_categories)
+            user_categories_ids = await self.get_user_categories_id(
+                user_id=user_id, session=session
             )
-
-        # Check if user owns this category (has it in their user_categories)
-        user_categories_ids = await self.get_user_categories_id(
-            user_id=user_id, session=session
-        )
-        if category_id not in user_categories_ids:
-            raise AppError(
-                CategoryNotFoundError(
-                    message=f"You don't have access to this category."
+            if category_id not in user_categories_ids:
+                raise AppError(
+                    CategoryNotFoundError(
+                        message=f"You don't have access to this category."
+                    )
                 )
-            )
 
-        # Extract subcategory IDs
-        subcategories_id = [
-            subcategory.subcategory_id for subcategory in subcategories_data
-        ]
-
-        # Check if any subcategories already exist
-        not_existing_subcategories = await self.filter_not_existing_subcategories(
-            subcategories_id=subcategories_id, session=session
-        )
-        already_existing_subcategories = set(subcategories_id) - set(
-            not_existing_subcategories or []
-        )
-        if already_existing_subcategories:
-            raise AppError(
-                SubCategoryAlreadyExistsError(
-                    message=f"Subcategories {' '.join(already_existing_subcategories)} already exist."
+            if subcategories_title:
+                existing_titles = set(
+                    await session.scalars(
+                        statement=select(SubCategory.title).where(
+                            SubCategory.title.in_(subcategories_title)
+                        )
+                    )
                 )
-            )
+                if existing_titles:
+                    raise AppError(
+                        SubCategoryAlreadyExistsError(
+                            message=f"Subcategories '{', '.join(existing_titles)}' already exist"
+                        )
+                    )
 
-        # Create new subcategories
-        new_subcategories = [
-            SubCategory(
-                subcategory_id=subcategory.subcategory_id,
-                title=subcategory.title,
-                category_id=category_id,
-                added_by_users=subcategory.added_by_users,
-            )
-            for subcategory in subcategories_data
-        ]
-        session.add_all(new_subcategories)
-        await session.commit()
+                subcategories_orm = []
+                user_subcategories_orm = []
 
-        # Link subcategories to user
-        user_subcategories = [
-            UserSubCategory(user_id=user_id, subcategory_id=subcategory.subcategory_id)
-            for subcategory in subcategories_data
-        ]
-        session.add_all(user_subcategories)
-        await session.commit()
+                for subcat in categories_data.subcategories:
+                    subcategories_orm.append(
+                        SubCategory(
+                            subcategory_id=subcat.uuid,
+                            title=subcat.title,
+                            added_by_users=True,
+                            category_id=category_id,
+                        )
+                    )
+                    user_subcategories_orm.append(
+                        UserSubCategory(user_id=user_id, subcategory_id=subcat.uuid)
+                    )
+
+                    session.add_all(subcategories_orm)
+                    session.add_all(user_subcategories_orm)
+            
+                    await session.commit()
+
+        # Background process to create records in pinecone remaining
 
         # Return updated user categories
         return await self.get_user_categories(user_id=user_id, session=session)
+
 
     async def get_user_subcategories_id(
         self, user_id: str, session: AsyncSession
@@ -551,7 +561,7 @@ class CategoriesDBService(BaseDBInteractions):
 
     async def get_user_categories(
         self, user_id: str, session: AsyncSession
-    ) -> List[ResponseCategoryDataModel]:
+    ) -> ResponseCategoryDataModel:
         """Returns all the categories of the user and the subcategory in structured format."""
         subq_categories = (
             select(UserCategory).where(UserCategory.user_id == user_id).subquery()
@@ -578,22 +588,23 @@ class CategoriesDBService(BaseDBInteractions):
             statement=stmt_subcategories, session=session, to="rows"
         )
 
-        category_data: List[ResponseCategoryDataModel] = [
-            ResponseCategoryDataModel(
-                **{
-                    "category_id": category_row[0],
-                    "title": category_row[1],
-                    "subcategories": [
-                        {"subcategory_id": subcategory[0], "title": subcategory[1]}
-                        for subcategory in user_subcategories
-                        if subcategory[2] == category_row[0]
-                    ],
-                }
-            )
-            for category_row in user_categories
-        ]
+        category_data: ResponseCategoryDataModel = ResponseCategoryDataModel(
+            categories_data=[
+                ResponseCategoryData(
+                    **{
+                        "category_id": category_row[0],
+                        "title": category_row[1],
+                        "subcategories": [
+                            {"subcategory_id": subcategory[0], "title": subcategory[1]}
+                            for subcategory in user_subcategories
+                            if subcategory[2] == category_row[0]
+                        ],
+                    }
+                )
+                for category_row in user_categories
+            ]
+        )
         return category_data
-
 
 
 class NewsDBService:

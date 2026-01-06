@@ -137,8 +137,7 @@ async def add_subcategories_to_category(
     result: ResponseCategoryDataModel = (
         await category_service.add_subcategories_to_existing_category(
             user_id=user_id,
-            category_id=payload.category_id,
-            subcategories_data=payload.subcategories,
+            categories_data=payload,
             session=session,
         )
     )

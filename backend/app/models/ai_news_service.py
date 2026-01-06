@@ -1,28 +1,28 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 
 # Response for all category related tasks
 class SubCategoryModel(BaseModel):
-    subcategory_id: UUID | str
+    subcategory_id: UUID
     title: str
 
 class ResponseCategoryData(BaseModel):
-    category_id: UUID | str
+    category_id: UUID
     title: str
     subcategories: Optional[List[SubCategoryModel]]
 
 class ResponseCategoryDataModel(BaseModel):
     """Use when you need to give full category data response"""
-    categories: List[ResponseCategoryData]
+    categories_data: List[ResponseCategoryData]
 
 
 # For setting and updating the categories
 class SetCategoriesData(BaseModel):
-    category_id: UUID | str
-    subcategories: List[UUID | str]
+    category_id: UUID 
+    subcategories: List[UUID]
 
 # Both classes are same but used for naming only 
 class SetUsersCategoriesModel(BaseModel):
@@ -36,6 +36,7 @@ class UpdateUsersCategoriesModel(BaseModel):
 
 
 class CreateCustomSubcategory(BaseModel):
+    uuid: UUID = Field(default_factory=uuid4)
     title: str
     added_by_users: bool = True
 
@@ -51,6 +52,7 @@ class CreateCustomCategoryDataModel(BaseModel):
         }
     ```
     """
+    uuid: UUID = Field(default_factory=uuid4)
     title: str
     added_by_users: bool = True
     subcategories: Optional[List[CreateCustomSubcategory]]
@@ -58,7 +60,7 @@ class CreateCustomCategoryDataModel(BaseModel):
 
 class CreateSubcategoriesToCategoryModel(BaseModel):
     """Use when adding new subcategories to existing category."""
-    category_id: UUID | str
+    category_id: UUID
     subcategories: List[CreateCustomSubcategory]
     
 
