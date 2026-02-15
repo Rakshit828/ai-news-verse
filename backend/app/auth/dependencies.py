@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 
 
 from app.db.schemas import Users
-from app.db.main import get_session
+from app.db.dependencies import get_session
 from app.auth.utils import decode_jwt_tokens
 from app.services.auth import AuthService
 from app.auth.exceptions import InvalidJWTTokenError, UserNotFoundError, PermissionDeniedError

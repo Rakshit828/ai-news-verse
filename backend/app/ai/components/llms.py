@@ -46,7 +46,8 @@ def retry_on_groq_rate_limit(
 
             models_to_retry: list[GroqModelEnum] = (
                 model_list if max_retries is None else model_list[:max_retries]
-            ).remove(first_model_used)
+            )
+            models_to_retry.remove(first_model_used)
 
             last_exc: Exception | None = None
 

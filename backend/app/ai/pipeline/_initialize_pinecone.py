@@ -1,45 +1,95 @@
 """This file contains the initial pineline to be triggerred to store the data in pinecone."""
 
+
 import asyncio
 from loguru import logger
+import sqlalchemy.exc as exc
+import uuid
 
 from app.ai.components.pinecone_db import init_pinecone_db, PineconeClient
-from app.ai.models import TitleCategoryRecord
-from app.repository import init_repository, NewsRepository
-from app.db.main import get_session
+from app.ai.models import PrimaryCategoryRecord, TopicKeywordRecord, PrimaryCategoryRecordResponse
+from app.services.ai_news_service import CategoriesDBService
+from app.db.dependencies import get_session
+from app.constants import (
+    PINECONE_APPLICATION_CATEGORY_NAMESPACE,
+    PINECONE_USER_CATEGORY_NAMESPACE,
+    PINECONE_CANONICAL_TOPIC_NAMESPACE,
+)
+from app.ai.components.topic_description_generator import TopicDescriptionGenerator, TopicDescription, CanonicalName
+from app.models.ai_news_service import ResponseCategoryDataModel
 
-# groq.RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01jzf764c7eenssycd98hwa9zr` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199682, Requested 672. Please try again in 2m32.928s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}
 
-async def main_pipeline():
+class PineconeInitializer:
+    def __init__(self, pinecone: PineconeClient, categories_data: ResponseCategoryDataModel, topic_description_generator: TopicDescriptionGenerator):
+        self.pinecone = pinecone
+        self.categories_data = categories_data
+        self.topic_description_generator = topic_description_generator
 
-    logger.critical("Run only once, data might be duplicated in pinecone db.")
 
-    choice = input("Do you want to proceed?(y/n): ")
+    async def main_pipeline(self):
 
-    if choice.lower() != 'y':
-        return
+        logger.critical("Run only once, data might be duplicated in pinecone db.")
 
-    repository: NewsRepository = await init_repository()
-    pinecone: PineconeClient = await init_pinecone_db()
+        choice = input("Do you want to proceed?(y/n): ")
 
-    async for session in get_session():
-        await repository.fetch_classify_and_save_articles(
-            session=session, source='GOOGLE', cutoff_hours=48, commit_on_each=True, scrape_content=False
-        )
-        await repository.fetch_classify_and_save_articles(
-            session=session, source='OPENAI', cutoff_hours=48, commit_on_each=True, scrape_content=False
-        )
-        await repository.fetch_classify_and_save_articles(
-            session=session, source='ANTHROPIC', cutoff_hours=48, commit_on_each=True, scrape_content=False
-        )
-        await repository.fetch_classify_and_save_articles(
-            session=session, source='HACKERNOON', cutoff_hours=48, commit_on_each=True, scrape_content=False
-        )
+        if choice.lower() != 'y':
+            return
 
-        pinecone_records: list[TitleCategoryRecord] = await repository.db.get_records_for_pinecone(session=session)
-        
-    await pinecone.upsert_records(records=pinecone_records)
+        pinecone_records: list[PrimaryCategoryRecord] = []
+        canonical_topics_records: list[TopicKeywordRecord] = []
+        for category in self.categories_data.categories_data:
+            canonical_name: CanonicalName = await self.topic_description_generator.generate_canonical_name(topic=category.title)
+            canonical_topics_records.append(
+                TopicKeywordRecord(
+                    id=str(uuid.uuid4()),
+                    content=canonical_name.canonical_name,
+                    category_id=str(category.category_id),
+                )
+            )
+            for subcategory in category.subcategories:
+                await asyncio.sleep(3)
+                topic_description: TopicDescription = await self.topic_description_generator.generate_topic_description(topic=subcategory.title)
+                pinecone_records.append(
+                    PrimaryCategoryRecord(
+                        _id=str(uuid.uuid4()),
+                        topic=topic_description.canonical_name,
+                        content=topic_description.description,
+                        category_id=str(category.category_id),
+                        subcategory_id=str(subcategory.subcategory_id),
+                    )
+                )
+                canonical_topics_records.append(
+                    TopicKeywordRecord(
+                        id=str(uuid.uuid4()),
+                        content=canonical_name.canonical_name,
+                        category_id=str(category.category_id),
+                        subcategory_id=str(subcategory.subcategory_id),
+                    )
+                )
+    
+        await self.pinecone.upsert_records(records=pinecone_records, upsert_in=PINECONE_APPLICATION_CATEGORY_NAMESPACE)
+        await self.pinecone.upsert_records(records=canonical_topics_records, upsert_in=PINECONE_CANONICAL_TOPIC_NAMESPACE)
+
 
 
 if __name__ == "__main__":
-    asyncio.run(main_pipeline())
+    async def main():
+        category_service: CategoriesDBService = CategoriesDBService()
+
+        async for session in get_session():
+            try:
+                categories_data: ResponseCategoryDataModel = await category_service.get_categories_data(session=session)
+            except Exception as e:
+                logger.error(f"Error Occurred : ", str(e))
+
+        pinecone: PineconeClient = await init_pinecone_db()
+        topic_description_generator: TopicDescriptionGenerator = TopicDescriptionGenerator()
+        
+        initializer: PineconeInitializer = PineconeInitializer(
+            pinecone=pinecone, 
+            categories_data=categories_data, 
+            topic_description_generator=topic_description_generator
+        )
+        await initializer.main_pipeline()
+
+    asyncio.run(main())

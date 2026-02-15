@@ -12,7 +12,8 @@ from app.models.ai_news_service import (
     TodayNewsResponse
 )
 from app.services.ai_news_service import NewsDBService, CategoriesDBService
-from app.db.main import get_session
+from app.services.utils import safely_run_controllers
+from app.db.dependencies import get_session
 from app.response import SuccessResponse
 from loguru import logger
 
@@ -30,7 +31,10 @@ news_service = NewsDBService()
     '/category-data', response_model=SuccessResponse[ResponseCategoryDataModel], description="Returs the existing categories in the database to select from to show in UI."
 )
 async def get_initial_category_data(session: AsyncSession = Depends(get_session)):
-    category_data = await category_service.get_categories_data(session=session)
+    category_data: ResponseCategoryDataModel = await safely_run_controllers(
+        category_service.get_categories_data, 
+        session=session
+    )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_200_OK,
         message="Returned Categories Successfully.",
@@ -48,8 +52,11 @@ async def set_user_categories(
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
     result: ResponseCategoryDataModel = (
-        await category_service.set_user_categories(
-            user_id=user_id, categories_data=categories_data, session=session
+        await safely_run_controllers(
+            category_service.set_user_categories,
+            session=session,
+            user_id=user_id,
+            categories_data=categories_data
         )
     )
     return SuccessResponse[ResponseCategoryDataModel](
@@ -70,8 +77,11 @@ async def update_user_categories(
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
     result: ResponseCategoryDataModel = (
-        await category_service.update_user_categories(
-            user_id=user_id, categories_data=categories_data, session=session
+        await safely_run_controllers(
+            category_service.update_user_categories,
+            session=session,
+            user_id=user_id,
+            categories_data=categories_data
         )
     )
     return SuccessResponse[ResponseCategoryDataModel](
@@ -91,7 +101,11 @@ async def get_user_categories(
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
     result: ResponseCategoryDataModel = (
-        await category_service.get_user_categories(user_id=user_id, session=session)
+        await safely_run_controllers(
+            category_service.get_user_categories,
+            session=session,
+            user_id=user_id
+        )
     )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_200_OK,
@@ -112,8 +126,10 @@ async def create_own_category(
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
     result: ResponseCategoryDataModel = (
-        await category_service.create_custom_category(
-            user_id=user_id, category_data=category_data, session=session
+        await safely_run_controllers(
+            category_service.create_custom_category,
+            user_id=user_id,
+            category_data=category_data,
         )
     )
     return SuccessResponse[ResponseCategoryDataModel](
@@ -135,11 +151,13 @@ async def add_subcategories_to_category(
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
     result: ResponseCategoryDataModel = (
-        await category_service.add_subcategories_to_existing_category(
+        await safely_run_controllers(
+            category_service.add_subcategories_to_existing_category,
+            session=session,
             user_id=user_id,
             categories_data=payload,
-            session=session,
         )
+
     )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_201_CREATED,
@@ -155,8 +173,10 @@ async def get_latest_news(
     session: AsyncSession = Depends(get_session),
 ):
     user_id = decoded_token["sub"]
-    today_news_response = await news_service.get_today_news(
-        user_id=user_id, session=session
+    today_news_response = await safely_run_controllers(
+        news_service.get_today_news,
+        session=session,
+        user_id=user_id
     )
     return SuccessResponse[TodayNewsResponse](
         status_code=status.HTTP_200_OK,

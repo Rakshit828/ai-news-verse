@@ -64,7 +64,7 @@ class OpenAiArticle(BaseArticle):
 
 class HackernoonArticle(BaseArticle):
     source: str = 'HACKERNOON'
-    category: Category 
+    category: Category | None = None
     sub_category: SubCategory | None = None
     markdown_content: str | None = None
 

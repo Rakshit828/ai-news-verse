@@ -17,7 +17,6 @@ from app.db.schemas import (
     UserSubCategory,
     Articles,
 )
-from app.db.main import get_session
 from app.models.ai_news_service import (
     GoogleNewsResponse,
     AnthropicNewsResponse,
@@ -30,7 +29,7 @@ from app.models.ai_news_service import (
     UpdateUsersCategoriesModel,
     CreateCustomCategoryDataModel,
     CreateSubcategoriesToCategoryModel,
-    # Data types
+
     SetCategoriesData,
 )
 
@@ -92,10 +91,10 @@ class BaseDBInteractions:
             return result.scalars().all()
 
 
+
 class CategoriesDBService(BaseDBInteractions):
     @staticmethod
     async def _initialize_categories(session: AsyncSession):
-
         with open(
             r"D:\GenAI\AiNewsSystem\backend\app\db\schemas\_category.json",
             "r",
@@ -141,7 +140,6 @@ class CategoriesDBService(BaseDBInteractions):
         self, session: AsyncSession
     ) -> ResponseCategoryDataModel:
         """Returs the full category and subcategory data from the table except custom ones."""
-        category_data = {"categories": []}
         statement = (
             select(Category)
             .where(Category.added_by_users == False)
@@ -154,24 +152,11 @@ class CategoriesDBService(BaseDBInteractions):
                 ),
             )
         )
+
         result = await session.execute(statement)
-        categories = result.unique().scalars().all()
-        for category in categories:
-            single_cat_data = {
-                "category_id": category.category_id,
-                "title": category.title,
-                "subcategories": [
-                    {
-                        "subcategory_id": subcategory.subcategory_id,
-                        "title": subcategory.title,
-                    }
-                    for subcategory in category.subcategories
-                ],
-            }
+        categories: List[Category] = result.unique().scalars().all()
+        return ResponseCategoryDataModel(categories_data=categories)
 
-            category_data["categories"].append(single_cat_data)
-
-        return ResponseCategoryDataModel(**category_data)
 
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "title"], session: AsyncSession
@@ -181,7 +166,9 @@ class CategoriesDBService(BaseDBInteractions):
             case "subcategory_id":
                 statement = select(SubCategory.subcategory_id)
             case "title":
-                statement = select(SubCategory.title)
+                statement = select(SubCategory.title).where(
+                    SubCategory.added_by_users == False
+                )
         result = (await session.execute(statement)).scalars().all()
         return result if result else None
 
@@ -607,6 +594,7 @@ class CategoriesDBService(BaseDBInteractions):
         return category_data
 
 
+
 class NewsDBService:
 
     def __init__(self, category_service: CategoriesDBService | None = None):
@@ -691,26 +679,6 @@ class NewsDBService:
         )
         return today_news_response
 
-    async def get_records_for_pinecone(
-        self,
-        session: AsyncSession,
-    ) -> List[dict]:
-        records = []
-        statement = select(
-            Articles.title, Articles.category_id, Articles.subcategory_id
-        )
-        result = await session.execute(statement)
-        rows = result.all()
-        for row in rows:
-            records.append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "title": row[0],
-                    "category": row[1],
-                    "subcategory": row[2],
-                }
-            )
-        return records
 
     async def create_article(
         self,
@@ -756,12 +724,15 @@ class NewsDBService:
         return result.scalars().all()
 
 
-if __name__ == "__main__":
+
+async def main():
+    from app.db.dependencies import get_session
     category_services = CategoriesDBService()
     news_services = NewsDBService()
+    async for session in get_session():
+        # await category_services._initialize_categories(session)
+        await category_services.get_categories_data(session)
 
-    async def main():
-        async for session in get_session():
-            await category_services._initialize_categories(session)
 
+if __name__ == '__main__':
     asyncio.run(main())

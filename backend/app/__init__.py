@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from app.response import AppError
-from app.routes import auth_routes, news_routes
-from app.log import logger
+from app.api.v1.auth_api import auth_routes
+from app.api.v1.news_service_api import news_routes
+from loguru import logger
 
 VERSION = "v1"
 origins = [

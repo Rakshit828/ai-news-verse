@@ -19,7 +19,7 @@ class SuccessResponse(ResponseBase[T]):
 
 class ErrorResponse(ResponseBase[T]):
     status: str = "error"
-    message: str = "An Error Occurred"
+    message: str = "Something Went Wrong."
     status_code: int = 400
     error: str = ""
 

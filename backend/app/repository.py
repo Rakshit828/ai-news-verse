@@ -2,10 +2,10 @@ from typing import List, Tuple, Literal
 import asyncio
 from loguru import logger
 
-from app.db.models.ai_news_service import Articles
-from app.news_service.components.classifier import Classifier
-from app.db.main import get_session, AsyncSession
-from app.controllers.ai_news_service import NewsDBService
+from app.db.schemas.ai_news_service import Articles
+from app.db.main import AsyncSession
+from app.db.dependencies import get_session
+from app.services.ai_news_service import NewsDBService
 from app.news_service.types import ServiceArticle
 from app.news_service.types import ClassifiedCategory, MarkdownContent
 from app.news_service import (
@@ -14,7 +14,8 @@ from app.news_service import (
     GoogleService,
     HackernoonService,
 )
-
+from app.news_service.components.classifier import AiCategoryClassifier
+from app.ai.pipeline.news_title_classification import VDBCategoryClassifier
 
 class InvalidArgument(Exception):
     pass
@@ -25,14 +26,14 @@ class NewsRepository:
         self,
         *,
         db: NewsDBService | None = None,
-        classifier: Classifier | None = None,
+        classifier: AiCategoryClassifier | None = None,
         openai: OpenAiService | None = None,
         google: GoogleService | None = None,
         hackernoon: HackernoonService | None = None,
         anthropic: AnthropicService | None = None,
     ):
         self.db: NewsDBService | None = db
-        self.classifier: Classifier | None = classifier
+        self.classifier: AiCategoryClassifier | None = classifier
         self.openai: OpenAiService | None = openai
         self.google: GoogleService | None = google
         self.anthropic: AnthropicService | None = anthropic
@@ -97,17 +98,22 @@ class NewsRepository:
         scrape_content: bool = True,
     ) -> Tuple[MarkdownContent | None, ClassifiedCategory]:
         if scrape_content is True:
-            markdown_content: MarkdownContent = (
-                await self.current_service.scraper.scrape_url(
-                    url=url, content_format="markdown"
-                )
-            )
+            markdown_content: MarkdownContent = self._fetch_articles(url=url)
         else:
             markdown_content = None
         classified_category: ClassifiedCategory = (
-            await self.classifier.classify_category(news_title=title)
+            await self.classifier.run(news_title=title)
         )
         return (markdown_content, classified_category)
+    
+    
+    async def _fetch_articles(self, url: str) -> MarkdownContent | None:
+        markdown_content: MarkdownContent = (
+            await self.current_service.scraper.scrape_url(
+                url=url, content_format="markdown"
+            )
+        )
+        return markdown_content
 
 
 
@@ -205,35 +211,131 @@ class NewsRepository:
             if classified_articles:
                 await self.bulk_save_articles(classified_articles, session)
             return len(classified_articles)
+        
+
+    async def fetch_save_articles(
+        self,
+        session: AsyncSession,
+        source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"],
+        cutoff_hours: int = 24,
+        commit_on_each: bool = False,
+        scrape_content: bool = True,
+    ) -> int:
+        """Main workflow: fetch, and save articles"""
+        self.current_service = None
+        match source:
+            case "ANTHROPIC":
+                self.current_service = self.anthropic
+            case "GOOGLE":
+                self.current_service = self.google
+            case "OPENAI":
+                self.current_service = self.openai
+            case "HACKERNOON":
+                self.current_service = self.hackernoon
+            case _:
+                raise Exception("Invalid Source Input.")
+
+        entries = await self.current_service.scraper.get_entries_from_rss_feed(
+            cutoff_hours=cutoff_hours
+        )
+
+        if not entries:
+            print(f"No new entries found for {self.current_service.__class__.__name__}")
+            return 0
+
+        all_guids = {entry.guid for entry in entries}
+        all_exising_guids = await self.db.get_all_guids(
+            session=session,
+            source=self.current_service.get_source(),
+            cutoff_hours=cutoff_hours,
+        )
+        already_existing = set(all_exising_guids).intersection(all_guids)
+
+        logger.info(f"{len(already_existing)} entires already existed.")
+
+        #This creates all the valid guids to be stored in the db
+        entries = [entry for entry in entries if entry.guid not in already_existing]
+
+        logger.info(f"Total entries to be fetched: {len(entries)}")
+
+        if commit_on_each is True:
+            no_of_articles = 0
+            for entry in entries:
+                if scrape_content:
+                    markdown_content: MarkdownContent = self._fetch_articles(
+                        url=entry['link']
+                    )
+                else:
+                    markdown_content = None
+
+                service_article: ServiceArticle = (
+                    await self.current_service.to_service_article(
+                        entry=entry,
+                        markdown_content=markdown_content,
+                    )
+                )
+
+                if service_article is not None:
+                    await self.save_article(
+                        article=service_article, session=session
+                    )
+                no_of_articles = no_of_articles + 1
+            return no_of_articles
+
+        else:
+
+            classified_articles: List[ServiceArticle] = []
+            for entry in entries:
+                if scrape_content:
+                    markdown_content: MarkdownContent = self._fetch_articles(
+                        url=entry['link']
+                    )
+                else:
+                    markdown_content = None
+
+                service_article: ServiceArticle = (
+                    await self.current_service.to_service_article(
+                        entry=entry,
+                        markdown_content=markdown_content,
+                    )
+                )
+                if service_article is not None:
+                    classified_articles.append(service_article)
+
+            if classified_articles:
+                await self.bulk_save_articles(classified_articles, session)
+            return len(classified_articles)
 
 
 
 
-async def contruct_google_rss_urls(subcategory_ids: list[str]) -> list[str]:
+
+async def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:
     """Returns the list of rss urls with categories from database."""
     rss_urls = [
-        GoogleService.BASE_URL.format(sub_category_query=subcategory_id)
-        for subcategory_id in subcategory_ids
+        GoogleService.BASE_URL.format(sub_category_query=subcategory_title.replace(" ", "-").lower())
+        for subcategory_title in subcategory_titles
     ]
-    print("RSS URLS ARE : ", rss_urls)
     return rss_urls
 
 
-async def init_repository() -> NewsRepository:
+async def init_repository(classifier: Literal["ai", "vector_db"] = "vector_db") -> NewsRepository:
     db = NewsDBService()
     async for session in get_session():
         categories_data = await db.category_service.get_categories_data(
             session=session
         )
-        subcategory_ids = await db.category_service.get_subcategory_column(
-            column="subcategory_id", session=session
+        subcategory_titles = await db.category_service.get_subcategory_column(
+            column="title", session=session
         )
+    
+    categories_data_json = categories_data.model_dump_json()
 
     google_rss_urls: list[str] = await contruct_google_rss_urls(
-        subcategory_ids=subcategory_ids
+        subcategory_titles=subcategory_titles
     )
 
-    classifier = Classifier(categories_data=categories_data)
+    classifier = AiCategoryClassifier(categories_data=categories_data_json) if classifier == "ai" else VDBCategoryClassifier()
     openai = await OpenAiService.create()
     google = await GoogleService.create(rss_urls=google_rss_urls)
     anthropic = await AnthropicService.create()
@@ -251,13 +353,14 @@ async def init_repository() -> NewsRepository:
 
 if __name__ == '__main__':
     async def main():
-        repository: NewsRepository = await init_repository()
+        repository: NewsRepository = await init_repository(classifier="ai")
         async for session in get_session():
             await repository.fetch_classify_and_save_articles(
                 session=session,
                 commit_on_each=False,
-                source="HACKERNOON",
+                source="ANTHROPIC",
                 scrape_content=False,
+                cutoff_hours=24,
             )
 
     asyncio.run(main())

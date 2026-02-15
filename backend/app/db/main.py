@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import CONFIG
 
+
 Base = declarative_base()
 
 # Async engine
@@ -15,9 +16,4 @@ Session = sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
-            
-# Dependency for FastAPI
-async def get_session():
-    async with Session() as session:
-        yield session
 

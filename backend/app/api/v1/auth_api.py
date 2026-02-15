@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from app.db.main import get_session
+from app.db.dependencies import get_session
 from app.config import CONFIG
 from app.services.auth import AuthService
 from app.auth.dependencies import RefreshTokenBearer

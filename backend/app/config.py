@@ -14,7 +14,6 @@ class Config(BaseSettings):
     PINECONE_API_KEY: str
     PINECONE_HOST: str
 
-
     GROQ_API_KEY: str
 
     ANTHROPIC_RSS_URLS: str

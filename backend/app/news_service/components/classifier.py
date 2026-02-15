@@ -4,15 +4,15 @@ from loguru import logger
 from typing import Optional
 
 from app.news_service.types import CategoriesData, ClassifiedCategory
-from backend.app.ai.components.llms import UseLLMsGroq, GroqModelEnum
+from app.ai.components.llms import UseLLMsGroq, GroqModelEnum
 
 
-class CategoryClassifier:
+class AiCategoryClassifier:
     CLASSIFY_CATEGORY_PROMPT = """
         You are an AI assistant for classifying AI news.
 
         Task:
-        Given a news **TITLE**, return the closest matching **category** and **subcategory** from **CATEGORY_DATA**.
+        Given a news **TITLE**, return the closest matching **category title** and **subcategory title** from **CATEGORY_DATA**.
         Also you have to give score for your classification.
 
         Rules:
@@ -28,8 +28,8 @@ class CategoryClassifier:
 
         Output (exact structure):
         {{
-        "category": {{ "category_id": "sectors", "title": "Sector-Specific" }},
-        "subcategory": {{ "subcategory_id": "ai-healthcare", "title": "Healthcare" }}
+        "category": {{ "category_id": "98cd534e-65f9-454f-9d8c-1956a3858be8", "title": "Sector-Specific" }},
+        "subcategory": {{ "subcategory_id": "875f09de-8339-4054-8ec1-d633bb57e6ee", "title": "Healthcare" }}
         "category_confidence": 0.98
         "subcategory_confidence": 0.88
         }}
@@ -55,7 +55,7 @@ class CategoryClassifier:
         """Classifies the News Title and returns the response returned by AI model as
         ```python ClassifiedCategory
         """
-        await asyncio.sleep(1)  # To avoid rate limiting errors
+        await asyncio.sleep(3)  # To avoid rate limiting errors
         final_category_data: CategoriesData = (
             categories_data if categories_data is not None else self.categories_data
         )
@@ -64,11 +64,16 @@ class CategoryClassifier:
             title=news_title, category_data=final_category_data
         )
 
+        logger.debug(f"\nPrompt: {prompt}")
+
         try:
             result = await self._client.chat_completion(
                 prompt=prompt, model=model, temperature=temperature
             )
             classified_response = json.loads(result)
+
+            logger.debug(f"\n\nClassification Response AI: {classified_response}")
+
         except json.JSONDecodeError as e:
             logger.error("LLM is not able to produce JSON serializable response.")
             raise e

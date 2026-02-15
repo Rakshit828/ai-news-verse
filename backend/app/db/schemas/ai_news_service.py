@@ -31,7 +31,7 @@ class Articles(Base):
 
     # Foreign keys
     category_id: Mapped[Optional[str]] = mapped_column(
-        ForeignKey("news_categories.category_id", ondelete="SET NULL"), nullable=False
+        ForeignKey("news_categories.category_id", ondelete="SET NULL"), nullable=True
     )
     subcategory_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("news_subcategories.subcategory_id", ondelete="SET NULL"),

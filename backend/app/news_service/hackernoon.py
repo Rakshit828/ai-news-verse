@@ -21,6 +21,7 @@ class HackernoonService(BaseNewsService):
             )
         super().__init__()
         self.scraper = scraper
+        
     @classmethod
     async def create(cls):
         """Factory method to create Anthropic service instance"""
@@ -36,7 +37,7 @@ class HackernoonService(BaseNewsService):
     async def to_service_article(
         self,
         entry: Dict,
-        classified_category: ClassifiedCategory,
+        classified_category: ClassifiedCategory | None = None,
         markdown_content: str | None = None,
     ) -> HackernoonArticle:
         published_parsed = getattr(entry, "published_parsed", None)
@@ -46,11 +47,11 @@ class HackernoonService(BaseNewsService):
             url=entry.get('link'),
             title=entry.get("title"),
             description=entry.get("description"),
-            category=classified_category.category,
+            category=classified_category.category if classified_category is not None else None,
             published_on=published_time,
             sub_category=(
                 classified_category.subcategory
-                if classified_category.subcategory is not None
+                if classified_category is not None
                 else None
             ),
             markdown_content=markdown_content if markdown_content is not None else None,

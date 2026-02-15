@@ -1,7 +1,8 @@
-from app.ai.models import TitleCategoryRecord, TitleRecordResponse, TitleRecordFields
+from app.ai.models import PrimaryCategoryRecord, TopicKeywordRecord, PrimaryCategoryRecordResponse, TopicKeywordRecordResponse
 
 __all__ = [
-    "TitleCategoryRecord",
-    "TitleRecordResponse",
-    "TitleRecordFields"
+    "PrimaryCategoryRecord",
+    "TopicKeywordRecord",
+    "PrimaryCategoryRecordResponse",
+    "TopicKeywordRecordResponse"
 ]
