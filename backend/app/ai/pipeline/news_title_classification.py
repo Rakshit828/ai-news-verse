@@ -51,6 +51,9 @@ class VDBCategoryClassifier:
             }
             for record in user_records if record["_score"] > app_record_score
         ]
+        
+        if len(response) == 0:
+            response["user-defined"] = None
 
         return response
 

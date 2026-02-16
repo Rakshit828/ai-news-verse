@@ -135,7 +135,7 @@ class NewsRepository:
                     entry=entry, scrape_content=scrape_content, classify=classify
                 )
                 if service_article is not None:
-                    await self.save_article(article=service_article, session=session)
+                    await self.db.create_article(article=service_article, session=session)
                 no_of_articles = no_of_articles + 1
             return no_of_articles
 
@@ -151,7 +151,7 @@ class NewsRepository:
                     classified_articles.append(service_article)
 
             if classified_articles:
-                await self.bulk_save_articles(classified_articles, session)
+                await self.db.bulk_create_articles(classified_articles, session)
 
             return len(classified_articles)
 

@@ -685,6 +685,8 @@ class NewsDBService:
         article: ServiceArticle,
         session: AsyncSession,
     ) -> None:
+        user_defined_classification = []
+
         article_dict: dict = article.model_dump()
         classification_response: ClassificationResponse = article_dict.pop(
             key="classification"
@@ -695,17 +697,19 @@ class NewsDBService:
             category_id=classification_response["app_defined"][0]["category_id"],
             subcategory_id=classification_response["app_defined"][0]["subcategory_id"],
         )
-        user_defined_classification: list[UserDefinedArticleClassification] = [
-            UserDefinedArticleClassification(
-                article_id=article.get("guid", ""),
-                subcategory_id=classification["subcategory_id"],
-            )
-            for classification in classification_response["user_defined"]
-        ]
+        if classification_response["user_defined"] is not None:
+            user_defined_classification: list[UserDefinedArticleClassification] = [
+                UserDefinedArticleClassification(
+                    article_id=article.get("guid", ""),
+                    subcategory_id=classification["subcategory_id"],
+                )
+                for classification in classification_response["user_defined"]
+            ]
 
         async with session.begin():
             session.add(article_orm)
-            session.add_all(user_defined_classification)
+            if len(user_defined_classification) != 0:
+                session.add_all(user_defined_classification)
             await session.commit()
 
         return
@@ -731,25 +735,27 @@ class NewsDBService:
                     "subcategory_id"
                 ],
             )
-            user_defined_classification: list[UserDefinedArticleClassification] = [
-                UserDefinedArticleClassification(
-                    article_id=article.get("guid", ""),
-                    subcategory_id=classification["subcategory_id"],
-                )
-                for classification in classification_response["user_defined"]
-            ]
 
             article_orms.append(article_orm)
-            classification_orms.append(user_defined_classification)
+
+            if classification_response["user_defined"] is not None:
+                user_defined_classification: list[UserDefinedArticleClassification] = [
+                    UserDefinedArticleClassification(
+                        article_id=article.get("guid", ""),
+                        subcategory_id=classification["subcategory_id"],
+                    )
+                    for classification in classification_response["user_defined"]
+                ]
+                classification_orms.append(user_defined_classification)
 
         async with session.begin():
             session.add_all(article_orms)
-            for classification_orm in classification_orms:
-                session.add_all(classification_orm)
+            if len(classification_orms) != 0:
+                for classification_orm in classification_orms:
+                    session.add_all(classification_orm)
             session.commit()
 
         return
-
 
     async def check_guid(self, guid: str, source: str, session: AsyncSession):
         """Check the existence of guid of articles object."""

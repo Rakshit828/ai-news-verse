@@ -8,7 +8,7 @@ class CategoryResponse(TypedDict):
 
 class ClassificationResponse(TypedDict):
     app_defined: list[CategoryResponse]
-    user_defined: list[CategoryResponse]
+    user_defined: list[CategoryResponse] | None = None
 
 class PrimaryCategoryRecord(TypedDict):
     """This is the record for storing the new category/subcategory title."""
