@@ -1,10 +1,18 @@
 """This file defines the logic to classify the category and subcategory from the title."""
 
-from app.ai import TitleRecordResponse
 from app.ai.components.pinecone_db import PineconeClient, init_pinecone_db
+from app.ai.models import (
+    PrimaryCategoryRecordResponse,
+    ClassificationResponse,
+)
+from app.constants import (
+    PINECONE_APPLICATION_CATEGORY_NAMESPACE,
+    PINECONE_USER_CATEGORY_NAMESPACE,
+)
+
 
 class VDBCategoryClassifier:
-    
+
     def __init__(self, pinecone: PineconeClient = None):
         self.pinecone = pinecone
 
@@ -12,54 +20,51 @@ class VDBCategoryClassifier:
     async def create(cls):
         return cls(pinecone=await init_pinecone_db())
 
-    async def _identify_correct_application_category(
-        self,
-        records: list[TitleRecordResponse],
-    ) -> tuple[str, str]:
-        
-        required_category = None
-        category_frequency = {}
 
-        # Step 1: Filter out the records with score less than 0.2
-        filtered_records = [record for record in records if record.get('_score', 0) >= 0.2]
-        # Step 2: Find the subcategory with most frequency
-        for record in filtered_records:
-            if record['fields']['subcategory'] in category_frequency:
-                category_frequency[record['fields']['subcategory']] += 1
-            else:
-                category_frequency[record['fields']['subcategory']] = 1
+    async def run(self, title: str) -> ClassificationResponse:
+        response = {
+            "app-defined": [],
+            "user-defined": [],
+        }
 
-        max_frequency_subcategory = max(category_frequency, key=category_frequency.get)
+        app_records: list[PrimaryCategoryRecordResponse] = (
+            await self.pinecone.get_relevant_title_records(
+                namespace=PINECONE_APPLICATION_CATEGORY_NAMESPACE, title=title, k=1
+            )
+        )
+        user_records: list[PrimaryCategoryRecordResponse] = (
+            await self.pinecone.get_relevant_title_records(
+                namespace=PINECONE_USER_CATEGORY_NAMESPACE, title=title, k=4
+            )
+        )
 
-        # Step 3: Find category acc. to subcategory
-        for record in records:
-            if record['fields']['subcategory'] == max_frequency_subcategory:
-                required_category = record['fields']['category']
-                break
+        app_record_score = app_records[0]["_score"]
 
-        return required_category, max_frequency_subcategory
-    
+        response["app-defined"] = {
+            "category_id": app_records[0]["fields"]["category_id"],
+            "subcategory_id": app_records[0]["fields"]["subcategory_id"],
+        }
+        response["user-defined"] = [
+            {
+                "category_id": record["fields"]["category_id"],
+                "subcategory_id": record["fields"]["subcategory_id"],
+            }
+            for record in user_records if record["_score"] > app_record_score
+        ]
 
-    async def _identify_correct_user_category(self, records: list[TitleRecordResponse]):
-        pass
-    
+        return response
 
-    async def run(self, title: str) -> tuple[tuple[str, ...], ...]:
-        app_records: list[TitleRecordResponse] = await self.pinecone.relevant_title_records_from_application_namespace(title=title)
-        user_records: list[TitleRecordResponse] = await self.pinecone.relevant_title_records_from_user_namespace(title=title)
-
-        application_category: tuple[str, str] = await self._identify_correct_application_category(app_records)
-
-correct_category_subcategory(records)
-    
 
 
 if __name__ == "__main__":
+
     async def main():
         classifier = await VDBCategoryClassifier.create()
-        category, subcategory = await classifier.run(title="OpenAI Is Taking On Apple’s App Store. It’s Got a Long Way to Go.")
-        print(category, subcategory)
+        response: ClassificationResponse = await classifier.run(
+            title="OpenAI Is Taking On Apple’s App Store. It’s Got a Long Way to Go."
+        )
+        print(f"Classification Response : {response}")
 
     import asyncio
-    asyncio.run(main())
 
+    asyncio.run(main())

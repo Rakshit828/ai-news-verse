@@ -10,6 +10,7 @@ class TopicDescription(BaseModel):
     canonical_name: str
     description: str
 
+
 class CanonicalName(BaseModel):
     is_valid: bool
     canonical_name: str
@@ -17,20 +18,30 @@ class CanonicalName(BaseModel):
 
 class TopicDescriptionGenerator:
     PRIMARY_PROMPT = """
-        You are an expert taxonomy AI for a news aggregation system. 
-        Your goal is to normalize vague or specific user interests into a "Canonical Topic Definition" that will be used for vector database retrieval.
+        You are an expert taxonomy AI for a news aggregation system.
+        Your task is to normalize a user's vague or specific interest into a short, highly relevant "Canonical Topic Definition" for accurate classification and vector retrieval.
 
         ### INSTRUCTIONS:
-        1. Analyze the USER_INPUT.
-        2. Identify the core subject matter (Entity, Technology, Field, or Event).
-        3. Generate a "Canonical Name": Use standard, professional title-casing (e.g., convert "react js" -> "React.js Framework").
-        4. Generate a "Dense Description": A paragraph containing synonyms, related entities, strict keywords, and context. This description is optimized for **semantic similarity matching**.
-        5. Return **JSON** only.
+        1. Read the USER_INPUT.
+        2. Identify the single core topic (entity, technology, field, or event category).
+        3. Generate a "canonical_name": a standard professional title (Title Case).
+        4. Generate a "description": 1 short, keyword-dense sentence with only directly related synonyms, entities, and context.
+        5. Return JSON only.
 
         ### RULES:
-        - If the input is nonsense (e.g. "asdf"), return "is_valid": false.
-        - The "description" must be rich in keywords to ensure a high match score against relevant news titles.
-        - Do NOT hallucinate specific news events. Describe the *category* of news.
+        - If the input is nonsense or meaningless, return:
+        {{"is_valid": false}}
+        - Keep the description short, precise, and strictly on-topic.
+        - Do NOT include unrelated or broad extra concepts.
+        - Do NOT hallucinate specific news events or headlines.
+        - Focus only on the general category for semantic matching.
+
+        ### OUTPUT FORMAT:
+        {{
+        "is_valid": true,
+        "canonical_name": "...",
+        "description": "..."
+        }}
 
         ### EXAMPLES:
 
@@ -39,7 +50,7 @@ class TopicDescriptionGenerator:
         {{
         "is_valid": true,
         "canonical_name": "Stock Market & Finance",
-        "description": "Financial markets, wall street, stock exchanges (NYSE, NASDAQ), global economy, trading updates, S&P 500, Dow Jones, cryptocurrency trends, and investment banking news."
+        "description": "Stock markets, trading, major indexes (S&P 500, NASDAQ), equities, investment news, and global financial updates."
         }}
 
         Input: "musk starship"
@@ -47,13 +58,13 @@ class TopicDescriptionGenerator:
         {{
         "is_valid": true,
         "canonical_name": "SpaceX Starship Program",
-        "description": "Aerospace engineering updates regarding SpaceX, Elon Musk, the Starship launch vehicle, Super Heavy booster, Raptor engines, orbital flight tests, FAA regulations, and Mars colonization efforts."
+        "description": "SpaceX Starship development, launch testing, Super Heavy booster, Raptor engines, and aerospace regulation updates."
         }}
 
         ### ACTUAL TASK:
         USER_INPUT: "{user_input}"
 
-        Return JSON only. **Do not use markdown format**. Just json.
+        Return JSON only. No markdown. No extra text.
     """
 
     CANONICAL_NAME_ONLY_PROMPT = """
@@ -99,7 +110,7 @@ class TopicDescriptionGenerator:
             if groq_client
             else UseLLMsGroq(default_model=GroqModelEnum.GPT_OSS_120B)
         )
-    
+
     async def generate_canonical_name(
         self,
         topic: str,
@@ -115,7 +126,7 @@ class TopicDescriptionGenerator:
             result = await self._client.chat_completion(
                 prompt=prompt, model=model, temperature=temperature
             )
-            result = result.replace("json", "").replace('```', '')
+            result = result.replace("json", "").replace("```", "")
             canonical_name_response = json.loads(result)
 
         except json.JSONDecodeError as exc:
@@ -126,7 +137,6 @@ class TopicDescriptionGenerator:
         result = CanonicalName(**canonical_name_response)
         logger.info(f"Generated canonical name for topic: {topic}, result: {result}")
         return result
-
 
     async def generate_topic_description(
         self,
@@ -143,7 +153,7 @@ class TopicDescriptionGenerator:
             result = await self._client.chat_completion(
                 prompt=prompt, model=model, temperature=temperature
             )
-            result = result.replace("json", "").replace('```', '')
+            result = result.replace("json", "").replace("```", "")
             news_titles_response = json.loads(result)
 
         except json.JSONDecodeError as exc:

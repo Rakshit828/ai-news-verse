@@ -5,7 +5,6 @@ from sqlalchemy.exc import IntegrityError
 from typing import Sequence, List, Literal, Tuple
 import json
 import asyncio
-import uuid
 from uuid import UUID
 from datetime import datetime, timezone, time, timedelta
 
@@ -16,6 +15,7 @@ from app.db.schemas import (
     UserCategory,
     UserSubCategory,
     Articles,
+    UserDefinedArticleClassification,
 )
 from app.models.ai_news_service import (
     GoogleNewsResponse,
@@ -29,7 +29,6 @@ from app.models.ai_news_service import (
     UpdateUsersCategoriesModel,
     CreateCustomCategoryDataModel,
     CreateSubcategoriesToCategoryModel,
-
     SetCategoriesData,
 )
 
@@ -40,6 +39,10 @@ from app.exceptions import (
     CategoryNotFoundError,
     SubCategoryNotFoundError,
 )
+from app.news_service.types import ServiceArticle
+from app.ai.models import ClassificationResponse
+
+
 from loguru import logger
 
 
@@ -89,7 +92,6 @@ class BaseDBInteractions:
             return result.all()
         elif to == "list":
             return result.scalars().all()
-
 
 
 class CategoriesDBService(BaseDBInteractions):
@@ -156,7 +158,6 @@ class CategoriesDBService(BaseDBInteractions):
         result = await session.execute(statement)
         categories: List[Category] = result.unique().scalars().all()
         return ResponseCategoryDataModel(categories_data=categories)
-
 
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "title"], session: AsyncSession
@@ -470,7 +471,9 @@ class CategoriesDBService(BaseDBInteractions):
     ) -> ResponseCategoryDataModel:
         """Allows users to add new subcategories to an existing category."""
         category_id: UUID = categories_data.category_id
-        subcategories_title = [subcategory.title for subcategory in categories_data.subcategories]
+        subcategories_title = [
+            subcategory.title for subcategory in categories_data.subcategories
+        ]
 
         async with session.begin():
             # Check if user owns this category (has it in their user_categories)
@@ -517,14 +520,13 @@ class CategoriesDBService(BaseDBInteractions):
 
                     session.add_all(subcategories_orm)
                     session.add_all(user_subcategories_orm)
-            
+
                     await session.commit()
 
         # Background process to create records in pinecone remaining
 
         # Return updated user categories
         return await self.get_user_categories(user_id=user_id, session=session)
-
 
     async def get_user_subcategories_id(
         self, user_id: str, session: AsyncSession
@@ -592,7 +594,6 @@ class CategoriesDBService(BaseDBInteractions):
             ]
         )
         return category_data
-
 
 
 class NewsDBService:
@@ -679,26 +680,76 @@ class NewsDBService:
         )
         return today_news_response
 
-
     async def create_article(
         self,
-        article: Articles,
+        article: ServiceArticle,
         session: AsyncSession,
-    ):
-        """Stores the given Classified Article in the db"""
-        session.add(article)
-        await session.commit()
-        return True
+    ) -> None:
+        article_dict: dict = article.model_dump()
+        classification_response: ClassificationResponse = article_dict.pop(
+            key="classification"
+        )
+
+        article_orm = Articles(
+            **classification_response,
+            category_id=classification_response["app_defined"][0]["category_id"],
+            subcategory_id=classification_response["app_defined"][0]["subcategory_id"],
+        )
+        user_defined_classification: list[UserDefinedArticleClassification] = [
+            UserDefinedArticleClassification(
+                article_id=article.get("guid", ""),
+                subcategory_id=classification["subcategory_id"],
+            )
+            for classification in classification_response["user_defined"]
+        ]
+
+        async with session.begin():
+            session.add(article_orm)
+            session.add_all(user_defined_classification)
+            await session.commit()
+
+        return
 
     async def bulk_create_articles(
         self,
-        articles: List[Articles],
+        articles: List[ServiceArticle],
         session: AsyncSession,
     ):
-        """Stores the list of Classified Category object."""
-        session.add_all(articles)
-        await session.commit()
-        return True
+        article_orms: List[Articles] = []
+        classification_orms: List[List[UserDefinedArticleClassification]] = []
+
+        for article in articles:
+            article_dict: dict = article.model_dump()
+            classification_response: ClassificationResponse = article_dict.pop(
+                key="classification"
+            )
+
+            article_orm = Articles(
+                **classification_response,
+                category_id=classification_response["app_defined"][0]["category_id"],
+                subcategory_id=classification_response["app_defined"][0][
+                    "subcategory_id"
+                ],
+            )
+            user_defined_classification: list[UserDefinedArticleClassification] = [
+                UserDefinedArticleClassification(
+                    article_id=article.get("guid", ""),
+                    subcategory_id=classification["subcategory_id"],
+                )
+                for classification in classification_response["user_defined"]
+            ]
+
+            article_orms.append(article_orm)
+            classification_orms.append(user_defined_classification)
+
+        async with session.begin():
+            session.add_all(article_orms)
+            for classification_orm in classification_orms:
+                session.add_all(classification_orm)
+            session.commit()
+
+        return
+
 
     async def check_guid(self, guid: str, source: str, session: AsyncSession):
         """Check the existence of guid of articles object."""
@@ -724,9 +775,9 @@ class NewsDBService:
         return result.scalars().all()
 
 
-
 async def main():
     from app.db.dependencies import get_session
+
     category_services = CategoriesDBService()
     news_services = NewsDBService()
     async for session in get_session():
@@ -734,5 +785,5 @@ async def main():
         await category_services.get_categories_data(session)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

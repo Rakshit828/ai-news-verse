@@ -14,7 +14,6 @@ class Source(str, enum.Enum):
     HACKERNOON = "HACKERNOON"
 
 
-
 class Articles(Base):
     __tablename__ = "articles"
 
@@ -42,4 +41,19 @@ class Articles(Base):
         Index("idx_published_on", "published_on"),
         Index("idx_subcategory_id", "subcategory_id"),
         Index("idx_source", "source"),
+    )
+
+
+class UserDefinedArticleClassification(Base):
+    __tablename__ = "user_defined_article_classification"
+
+    # When there are two primary key, it is referred to as composite key. So the pair of keys
+    # must be unique. One key can repeat.
+
+    article_id: Mapped[str] = mapped_column(
+        ForeignKey("articles.guid", ondelete="CASCADE"), primary_key=True
+    )
+    subcategory_id: Mapped[str] = mapped_column(
+        ForeignKey("news_subcategories.subcategory_id", ondelete="CASCADE"),
+        primary_key=True,
     )

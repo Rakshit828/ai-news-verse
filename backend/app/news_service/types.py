@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import List, TypeAlias
-
+from typing import List, TypeAlias, Literal
+from app.ai.models import ClassificationResponse
 
 MarkdownContent: TypeAlias = str
 
@@ -21,13 +21,6 @@ class CategoriesData(BaseModel):
     """Represents the data of all the category with subcategories."""
     categories: List[CategoryData]
 
-class ClassifiedCategory(BaseModel):
-    category: Category
-    subcategory: SubCategory
-    category_confidence: float
-    subcategory_confidence: float
-
-
 
 class BaseArticle(BaseModel):
     guid: str = Field(description="The url of the article source itself")
@@ -35,38 +28,14 @@ class BaseArticle(BaseModel):
     description: str
     url: str
     published_on: datetime
+    summary: str | None = None
+    markdown_content: str | None = None
+    classification: ClassificationResponse
 
     model_config = ConfigDict(
         extra='ignore'
     )
 
 
-class GoogleArticle(BaseArticle):
-    source: str = 'GOOGLE'
-    category: Category 
-    sub_category: SubCategory | None = None
-    markdown_content: str | None = None
-
-
-class AnthropicArticle(BaseArticle):
-    source: str = 'ANTHROPIC'
-    category: Category 
-    sub_category: SubCategory | None = None
-    markdown_content: str | None = None
-
-
-class OpenAiArticle(BaseArticle):
-    source: str = 'OPENAI'
-    category: Category 
-    sub_category: SubCategory | None = None
-    markdown_content: str | None = None
-
-
-class HackernoonArticle(BaseArticle):
-    source: str = 'HACKERNOON'
-    category: Category | None = None
-    sub_category: SubCategory | None = None
-    markdown_content: str | None = None
-
-
-ServiceArticle: TypeAlias = GoogleArticle | AnthropicArticle | OpenAiArticle | HackernoonArticle
+class ServiceArticle(BaseArticle):
+    source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"]

@@ -1,4 +1,10 @@
-from app.ai.models import PrimaryCategoryRecord, TopicKeywordRecord, PrimaryCategoryRecordResponse, SubcategoryCheckResponse, CategoryCheckResponse
+from app.ai.models import (
+    PrimaryCategoryRecord,
+    TopicKeywordRecord,
+    PrimaryCategoryRecordResponse,
+    SubcategoryCheckResponse,
+    CategoryCheckResponse,
+)
 from app.config import CONFIG
 
 from pinecone import PineconeAsyncio
@@ -9,12 +15,13 @@ from loguru import logger
 from itertools import islice
 
 from app.constants import (
-    PINECONE_APPLICATION_CATEGORY_NAMESPACE, 
-    PINECONE_USER_CATEGORY_NAMESPACE, 
+    PINECONE_APPLICATION_CATEGORY_NAMESPACE,
+    PINECONE_USER_CATEGORY_NAMESPACE,
     PINECONE_INDEX_NAME,
-    PINECONE_CANONICAL_TOPIC_NAMESPACE
+    PINECONE_CANONICAL_TOPIC_NAMESPACE,
 )
-  
+
+
 class PineconeClient:
     _obj: "PineconeClient" = None
 
@@ -40,8 +47,9 @@ class PineconeClient:
         cls._obj = cls(index)
         return cls._obj
 
-
-    async def check_for_subcategory_existence(self, subcategory: str) -> SubcategoryCheckResponse | None:
+    async def check_for_subcategory_existence(
+        self, subcategory: str
+    ) -> SubcategoryCheckResponse | None:
         try:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
@@ -54,19 +62,21 @@ class PineconeClient:
             )
             subcategory = result["result"]["hits"][0]
             logger.debug(f"Subcategory from pinecone: {subcategory}")
-            if subcategory['_score'] >= 0.9:
+            if subcategory["_score"] >= 0.9:
                 return SubcategoryCheckResponse(
-                    category_id=subcategory['fields']['category_id'],
-                    subcategory_id=subcategory['fields']['subcategory_id'],
-                    content=subcategory['fields']['content']
+                    category_id=subcategory["fields"]["category_id"],
+                    subcategory_id=subcategory["fields"]["subcategory_id"],
+                    content=subcategory["fields"]["content"],
                 )
             return None
         except PineconeApiException as exc:
             raise exc
         except Exception as e:
             raise e
-    
-    async def check_for_category_existence(self, category: str) -> CategoryCheckResponse | None:
+
+    async def check_for_category_existence(
+        self, category: str
+    ) -> CategoryCheckResponse | None:
         try:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
@@ -79,10 +89,10 @@ class PineconeClient:
             )
             category = result["result"]["hits"][0]
             logger.debug(f"Category from pinecone: {category}")
-            if category['_score'] >= 0.9:
+            if category["_score"] >= 0.9:
                 return CategoryCheckResponse(
-                    category_id=category['fields']['category_id'],
-                    content=category['fields']['content']
+                    category_id=category["fields"]["category_id"],
+                    content=category["fields"]["content"],
                 )
             return None
         except PineconeApiException as exc:
@@ -90,9 +100,13 @@ class PineconeClient:
         except Exception as e:
             raise e
 
-
-    async def get_relevant_title_records(self, title: str, namespace: str, k: int = 10) -> List[PrimaryCategoryRecordResponse]:
-        if namespace != PINECONE_APPLICATION_CATEGORY_NAMESPACE and namespace != PINECONE_USER_CATEGORY_NAMESPACE:
+    async def get_relevant_title_records(
+        self, title: str, namespace: str, k: int = 10
+    ) -> List[PrimaryCategoryRecordResponse]:
+        if (
+            namespace != PINECONE_APPLICATION_CATEGORY_NAMESPACE
+            and namespace != PINECONE_USER_CATEGORY_NAMESPACE
+        ):
             raise ValueError("Invalid namespace value")
 
         try:
@@ -102,20 +116,27 @@ class PineconeClient:
                     "inputs": {"text": f"{title}"},
                     "top_k": k,
                 },
-                fields=['topic', 'category_id', 'subcategory_id']
+                fields=["topic", "category_id", "subcategory_id"],
             )
             hits = result.get("result", {}).get("hits", [])
             # logger.debug(f"Records from pinecone: {hits}")
             return hits
-        
+
         except PineconeApiException as exc:
             raise exc
         except Exception as e:
             raise e
 
-
-    async def upsert_records(self, records: List[PrimaryCategoryRecord] | List[TopicKeywordRecord], upsert_in: str):
-        if upsert_in not in [PINECONE_APPLICATION_CATEGORY_NAMESPACE, PINECONE_USER_CATEGORY_NAMESPACE, PINECONE_CANONICAL_TOPIC_NAMESPACE]:
+    async def upsert_records(
+        self,
+        records: List[PrimaryCategoryRecord] | List[TopicKeywordRecord],
+        upsert_in: str,
+    ):
+        if upsert_in not in [
+            PINECONE_APPLICATION_CATEGORY_NAMESPACE,
+            PINECONE_USER_CATEGORY_NAMESPACE,
+            PINECONE_CANONICAL_TOPIC_NAMESPACE,
+        ]:
             raise ValueError("Invalid upsert_in value")
 
         try:
@@ -157,7 +178,7 @@ if __name__ == "__main__":
 
     async def main():
         pinecone_client = await init_pinecone_db()
-        result: List[TitleRecordResponse] = (
+        result: List[PrimaryCategoryRecordResponse] = (
             await pinecone_client.get_relevant_title_records(
                 title="US is the most successful country in AI research after China.",
                 namespace=PINECONE_APPLICATION_CATEGORY_NAMESPACE,
