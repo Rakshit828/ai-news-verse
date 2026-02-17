@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request, Response
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from typing import List
 
@@ -6,18 +6,21 @@ from app.auth.dependencies import AccessTokenBearer
 from app.models.ai_news_service import (
     ResponseCategoryDataModel,
     SetUsersCategoriesModel,
+    SimilarCategoryExistsResponse,
+    SimilarSubcategoryExistsResponse,
+    SubcategoryAlreadyExistsResponse,
     UpdateUsersCategoriesModel,
-    CreateCustomCategoryDataModel,
-    CreateSubcategoriesToCategoryModel,
-    TodayNewsResponse
+    CreateCustomCategoryModel,
+    CreateCustomSubcategoryModel,
+    CategoryAlreadyExistsResponse,
+    TodayNewsResponse,
 )
 from app.services.ai_news_service import NewsDBService, CategoriesDBService
+from app.ai.components.pinecone_db import PineconeClient
 from app.services.utils import safely_run_controllers
 from app.db.dependencies import get_session
 from app.response import SuccessResponse
 from loguru import logger
-
-
 
 
 news_routes = APIRouter()
@@ -26,14 +29,14 @@ category_service = CategoriesDBService()
 news_service = NewsDBService()
 
 
-
 @news_routes.get(
-    '/category-data', response_model=SuccessResponse[ResponseCategoryDataModel], description="Returs the existing categories in the database to select from to show in UI."
+    "/category",
+    response_model=SuccessResponse[ResponseCategoryDataModel],
+    description="Returs the existing categories in the database to select from to show in UI.",
 )
 async def get_initial_category_data(session: AsyncSession = Depends(get_session)):
     category_data: ResponseCategoryDataModel = await safely_run_controllers(
-        category_service.get_categories_data, 
-        session=session
+        category_service.get_categories_data, session=session
     )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_200_OK,
@@ -43,7 +46,7 @@ async def get_initial_category_data(session: AsyncSession = Depends(get_session)
 
 
 @news_routes.post(
-    "/set/categories", response_model=SuccessResponse[ResponseCategoryDataModel]
+    "/category", response_model=SuccessResponse[ResponseCategoryDataModel]
 )
 async def set_user_categories(
     categories_data: SetUsersCategoriesModel,
@@ -51,13 +54,11 @@ async def set_user_categories(
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
-    result: ResponseCategoryDataModel = (
-        await safely_run_controllers(
-            category_service.set_user_categories,
-            session=session,
-            user_id=user_id,
-            categories_data=categories_data
-        )
+    result: ResponseCategoryDataModel = await safely_run_controllers(
+        category_service.set_user_categories,
+        session=session,
+        user_id=user_id,
+        categories_data=categories_data,
     )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_201_CREATED,
@@ -67,7 +68,7 @@ async def set_user_categories(
 
 
 @news_routes.put(
-    "/update/categories",
+    "/category",
     response_model=SuccessResponse[ResponseCategoryDataModel],
 )
 async def update_user_categories(
@@ -76,13 +77,11 @@ async def update_user_categories(
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
-    result: ResponseCategoryDataModel = (
-        await safely_run_controllers(
-            category_service.update_user_categories,
-            session=session,
-            user_id=user_id,
-            categories_data=categories_data
-        )
+    result: ResponseCategoryDataModel = await safely_run_controllers(
+        category_service.update_user_categories,
+        session=session,
+        user_id=user_id,
+        categories_data=categories_data,
     )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_201_CREATED,
@@ -92,7 +91,7 @@ async def update_user_categories(
 
 
 @news_routes.get(
-    "/get/my-categories",
+    "/category/me",
     response_model=SuccessResponse[ResponseCategoryDataModel],
 )
 async def get_user_categories(
@@ -100,12 +99,8 @@ async def get_user_categories(
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
-    result: ResponseCategoryDataModel = (
-        await safely_run_controllers(
-            category_service.get_user_categories,
-            session=session,
-            user_id=user_id
-        )
+    result: ResponseCategoryDataModel = await safely_run_controllers(
+        category_service.get_user_categories, session=session, user_id=user_id
     )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_200_OK,
@@ -115,23 +110,42 @@ async def get_user_categories(
 
 
 @news_routes.post(
-    "/create/category",
+    "/category/custom",
     response_model=SuccessResponse[ResponseCategoryDataModel],
     description="Allows the users to create the custom category with subcategories.",
 )
 async def create_own_category(
-    category_data: CreateCustomCategoryDataModel,
+    req: Request,
+    category_data: CreateCustomCategoryModel,
     decoded_token=Depends(AccessTokenBearer()),
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
-    result: ResponseCategoryDataModel = (
-        await safely_run_controllers(
-            category_service.create_custom_category,
-            user_id=user_id,
-            category_data=category_data,
-        )
+    pinecone_client: PineconeClient = req.state.pinecone_client
+    result: (
+        ResponseCategoryDataModel
+        | CategoryAlreadyExistsResponse
+        | SimilarCategoryExistsResponse
+    ) = await safely_run_controllers(
+        category_service.create_custom_category,
+        user_id=user_id,
+        category_data=category_data,
+        session=session,
+        pinecone_client=pinecone_client,
     )
+    if isinstance(result, CategoryAlreadyExistsResponse):
+        return SuccessResponse[CategoryAlreadyExistsResponse](
+            status_code=status.HTTP_200_OK,
+            message="Category Already Exists. You can select it.",
+            data=result,
+        )
+    if isinstance(result, SimilarCategoryExistsResponse):
+        return SuccessResponse[SimilarCategoryExistsResponse](
+            status_code=status.HTTP_200_OK,
+            message="Similar Category Already Exists. You can select it.",
+            data=result,
+        )
+
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_201_CREATED,
         message="Category Created Successfully",
@@ -140,25 +154,41 @@ async def create_own_category(
 
 
 @news_routes.post(
-    "/add-subcategories",
+    "/subcategory/custom",
     response_model=SuccessResponse[ResponseCategoryDataModel],
     description="Allows the users to add new subcategories to the existing category.",
 )
-async def add_subcategories_to_category(
-    payload: CreateSubcategoriesToCategoryModel,
+async def create_custom_subcategory(
+    req: Request,
+    payload: CreateCustomSubcategoryModel,
     decoded_token=Depends(AccessTokenBearer()),
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[ResponseCategoryDataModel]:
     user_id = decoded_token["sub"]
-    result: ResponseCategoryDataModel = (
-        await safely_run_controllers(
-            category_service.add_subcategories_to_existing_category,
-            session=session,
-            user_id=user_id,
-            categories_data=payload,
-        )
-
+    pinecone_client: PineconeClient = req.state.pinecone_client
+    result: (
+        ResponseCategoryDataModel
+        | SubcategoryAlreadyExistsResponse
+        | SimilarSubcategoryExistsResponse
+    ) = await safely_run_controllers(
+        category_service.create_custom_subcategory,
+        session=session,
+        user_id=user_id,
+        subcategory_data=payload,
+        pinecone_client=pinecone_client,
     )
+    if isinstance(result, SubcategoryAlreadyExistsResponse):
+        return SuccessResponse[SubcategoryAlreadyExistsResponse](
+            status_code=status.HTTP_200_OK,
+            message="Subcategory Already Exists. You can select it.",
+            data=result,
+        )
+    if isinstance(result, SimilarSubcategoryExistsResponse):
+        return SuccessResponse[SimilarSubcategoryExistsResponse](
+            status_code=status.HTTP_200_OK,
+            message="Similar Subcategory Already Exists. You can select it.",
+            data=result,
+        )
     return SuccessResponse[ResponseCategoryDataModel](
         status_code=status.HTTP_201_CREATED,
         message="Subcategories Added Successfully",
@@ -166,17 +196,14 @@ async def add_subcategories_to_category(
     )
 
 
-
-@news_routes.get("/get/news", response_model=SuccessResponse[TodayNewsResponse])
+@news_routes.get("/today", response_model=SuccessResponse[TodayNewsResponse])
 async def get_latest_news(
     decoded_token=Depends(AccessTokenBearer()),
     session: AsyncSession = Depends(get_session),
 ):
     user_id = decoded_token["sub"]
     today_news_response = await safely_run_controllers(
-        news_service.get_today_news,
-        session=session,
-        user_id=user_id
+        news_service.get_today_news, session=session, user_id=user_id
     )
     return SuccessResponse[TodayNewsResponse](
         status_code=status.HTTP_200_OK,

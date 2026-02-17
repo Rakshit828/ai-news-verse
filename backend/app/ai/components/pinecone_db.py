@@ -30,6 +30,9 @@ class PineconeClient:
 
     @classmethod
     async def create(cls, index_name: str, api_key: str, host: str):
+        if cls._obj:
+            return cls._obj
+
         client = PineconeAsyncio(api_key=api_key)
         if not await client.has_index(index_name):
             await client.create_index_for_model(
@@ -41,8 +44,6 @@ class PineconeClient:
                     "field_map": {"text": "title", "dimension": 2048},
                 },
             )
-        if cls._obj:
-            return cls._obj
         index = client.IndexAsyncio(host=host)
         cls._obj = cls(index)
         return cls._obj

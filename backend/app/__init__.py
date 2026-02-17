@@ -7,6 +7,8 @@ from app.api.v1.auth_api import auth_routes
 from app.api.v1.news_service_api import news_routes
 from loguru import logger
 
+from app.ai.components.pinecone_db import init_pinecone_db, PineconeClient
+
 VERSION = "v1"
 origins = [
     "http://localhost:5173",
@@ -14,16 +16,16 @@ origins = [
 ]
 
 
-# from contextlib import asynccontextmanager
-# from app.background_services import start_scheduler, scheduler
+from contextlib import asynccontextmanager
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     start_scheduler()
-#     yield
-#     scheduler.shutdown()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    pinecone_client: PineconeClient = await init_pinecone_db()
+    app.state.pinecone_client = pinecone_client
+    yield
 
-app = FastAPI(title="AiNewsVerse", version=VERSION)
+
+app = FastAPI(title="AiNewsVerse", version=VERSION, lifespan=lifespan)
 
 
 app.add_middleware(

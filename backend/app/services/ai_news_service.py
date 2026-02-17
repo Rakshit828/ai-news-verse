@@ -28,9 +28,13 @@ from app.models.ai_news_service import (
     ResponseCategoryData,
     SetUsersCategoriesModel,
     UpdateUsersCategoriesModel,
-    CreateCustomCategoryDataModel,
-    CreateSubcategoriesToCategoryModel,
+    CreateCustomCategoryModel,
+    CreateCustomSubcategoryModel,
     SetCategoriesData,
+    SimilarCategoryExistsResponse,
+    CategoryAlreadyExistsResponse,
+    SimilarSubcategoryExistsResponse,
+    SubcategoryAlreadyExistsResponse,
 )
 
 from app.response import AppError
@@ -41,7 +45,12 @@ from app.exceptions import (
     SubCategoryNotFoundError,
 )
 from app.news_service.types import ServiceArticle
-from app.ai.models import ClassificationResponse
+from app.ai.models import (
+    ClassificationResponse,
+    CategoryCheckResponse,
+    SubcategoryCheckResponse,
+)
+from app.ai.components.pinecone_db import PineconeClient
 
 
 from loguru import logger
@@ -122,7 +131,7 @@ class CategoriesDBService(BaseDBInteractions):
                         {
                             "subcategory_id": uuid.uuid4(),
                             "title": sub["title"],
-                            "category_id": category_rows[-1]['category_id'],
+                            "category_id": category_rows[-1]["category_id"],
                         }
                     )
 
@@ -139,7 +148,6 @@ class CategoriesDBService(BaseDBInteractions):
                 )
 
             await session.commit()
-
 
     async def get_categories_data(
         self, session: AsyncSession
@@ -397,139 +405,156 @@ class CategoriesDBService(BaseDBInteractions):
         user_id: str,
         category_data: CreateCustomCategoryDataModel,
         session: AsyncSession,
+        pinecone_client: PineconeClient,
     ) -> ResponseCategoryDataModel:
         """Allows users to create custom categories and subcategories within it."""
-        category = Category(
-            category_id=category_data.uuid,
-            title=category_data.title,
-            added_by_users=True,
+
+        # Check for category existence (DB)
+        stmt1 = (
+            select(Category.category_id, Category.title, UserCategory.user_id)
+            .outerjoin(
+                UserCategory,
+                (UserCategory.category_id == Category.category_id)
+                & (UserCategory.user_id == user_id),
+            )
+            .where(
+                Category.title == category_data.title,
+            )
         )
-        async with session.begin():
-            try:
-                session.add(category)
-                session.flush()
-            except IntegrityError as exc:
-                raise AppError(
-                    CategoryAlreadyExistsError(
-                        message=f"Category: '{category_data.title}' already exists"
-                    )
+
+        result = (await session.execute(stmt1)).one_or_none()
+
+        # It will be none if the category doesn't exists in the DB.
+        if result:
+            existing_category_id, existing_category_title, linked_user_id = result
+
+            if existing_category_id and linked_user_id:
+                # THis means category exists and belongs to the user
+                raise AppError(CategoryAlreadyExistsError())
+            elif existing_category_id and not linked_user_id:
+                # This means category exists but does not belong to the user
+                return CategoryAlreadyExistsResponse(
+                    category_title=existing_category_title,
+                    category_id=existing_category_id,
                 )
 
-            user_category_orm = UserCategory(
-                user_id=user_id, category_id=category_data.uuid
+        # Now that DB checks are finished, checking for category similarity in pinecone.
+        pinecone_cat: CategoryCheckResponse = (
+            await pinecone_client.check_for_category_existence(
+                category=category_data.title
+            )
+        )
+        if pinecone_cat:
+            return SimilarCategoryExistsResponse(
+                category_title=pinecone_cat["content"],
+                category_id=pinecone_cat["category_id"],
             )
 
-            session.add(user_category_orm)
-
-            subcategories_title = {s.title for s in category_data.subcategories}
-            if subcategories_title:
-                existing_titles = set(
-                    await session.scalars(
-                        statement=select(SubCategory.title).where(
-                            SubCategory.title.in_(subcategories_title)
-                        )
-                    )
-                )
-                if existing_titles:
-                    raise AppError(
-                        SubCategoryAlreadyExistsError(
-                            message=f"Subcategories '{', '.join(existing_titles)}' already exist"
-                        )
-                    )
-
-                subcategories_orm = []
-                user_subcategories_orm = []
-
-                for subcat in category_data.subcategories:
-                    subcategories_orm.append(
-                        SubCategory(
-                            subcategory_id=subcat.uuid,
-                            title=subcat.title,
-                            added_by_users=True,
-                            category_id=category_data.uuid,
-                        )
-                    )
-                    user_subcategories_orm.append(
-                        UserSubCategory(user_id=user_id, subcategory_id=subcat.uuid)
-                    )
-
-                    session.add_all(subcategories_orm)
-                    session.add_all(user_subcategories_orm)
-
-            await session.commit()
+        # Now that the both checks have passed, the category really doesn't exists and we are creating
+        # new one.
+        async with session.begin():
+            new_category = Category(
+                title=category_data.title,
+                added_by_users=True,
+            )
+            session.add(new_category)
+            session.add(
+                UserCategory(user_id=user_id, category_id=new_category.category_id)
+            )
 
         category_data_response: ResponseCategoryDataModel = (
             await self.get_user_categories(user_id=user_id, session=session)
         )
 
-        # Running the background tasks is remaining to initialize new records in pinecone
-
         return category_data_response
 
-    async def add_subcategories_to_existing_category(
+
+    async def create_custom_subcategory(
         self,
         user_id: str,
-        categories_data: CreateSubcategoriesToCategoryModel,
+        subcategory_data: CreateCustomSubcategoryModel,
         session: AsyncSession,
+        pinecone_client: PineconeClient,
     ) -> ResponseCategoryDataModel:
         """Allows users to add new subcategories to an existing category."""
-        category_id: UUID = categories_data.category_id
-        subcategories_title = [
-            subcategory.title for subcategory in categories_data.subcategories
-        ]
+        category_id: UUID = subcategory_data.category_id
+
+        # Check if user owns this category (has it in their user_categories)
+        check_stmt = select(UserCategory.category_id).where(
+            UserCategory.user_id == user_id,
+            UserCategory.category_id == category_id,
+        )
+        linked_category_id = (await session.execute(check_stmt)).scalar_one_or_none()
+        if not linked_category_id:
+            raise AppError(
+                CategoryNotFoundError(
+                    message=f"You don't have access to this category."
+                )
+            )
+
+        # Check for subcategory existence (DB)
+        stmt1 = (
+            select(
+                SubCategory.subcategory_id,
+                SubCategory.title,
+                UserSubCategory.user_id,
+            )
+            .where(
+                SubCategory.title == subcategory_data.title,
+                SubCategory.category_id == category_id,
+            )
+            .outerjoin(
+                UserSubCategory,
+                (UserSubCategory.subcategory_id == SubCategory.subcategory_id)
+                & (UserSubCategory.user_id == user_id),
+            )
+        )
+
+        result = (await session.execute(stmt1)).one_or_none()
+        if result:
+            (
+                existing_subcategory_id,
+                existing_subcategory_title,
+                linked_user_id,
+            ) = result
+
+            if existing_subcategory_id and linked_user_id:
+                raise AppError(SubCategoryAlreadyExistsError())
+
+            elif existing_subcategory_id and not linked_user_id:
+                return SubcategoryAlreadyExistsResponse(
+                    subcategory_title=existing_subcategory_title,
+                    subcategory_id=existing_subcategory_id,
+                )
+
+        # Pineapple Check
+        pinecone_sub: SubcategoryCheckResponse = (
+            await pinecone_client.check_for_subcategory_existence(
+                subcategory=subcategory_data.title
+            )
+        )
+        if pinecone_sub and str(pinecone_sub["category_id"]) == str(category_id):
+            return SimilarSubcategoryExistsResponse(
+                subcategory_title=pinecone_sub["content"],
+                subcategory_id=pinecone_sub["subcategory_id"],
+            )
 
         async with session.begin():
-            # Check if user owns this category (has it in their user_categories)
-            user_categories_ids = await self.get_user_categories_id(
-                user_id=user_id, session=session
+
+            new_subcategory = SubCategory(
+                title=subcategory_data.title,
+                added_by_users=True,
+                category_id=category_id,
             )
-            if category_id not in user_categories_ids:
-                raise AppError(
-                    CategoryNotFoundError(
-                        message=f"You don't have access to this category."
-                    )
+            session.add(new_subcategory)
+            session.add(
+                UserSubCategory(
+                    user_id=user_id, subcategory_id=new_subcategory.subcategory_id
                 )
-
-            if subcategories_title:
-                existing_titles = set(
-                    await session.scalars(
-                        statement=select(SubCategory.title).where(
-                            SubCategory.title.in_(subcategories_title)
-                        )
-                    )
-                )
-                if existing_titles:
-                    raise AppError(
-                        SubCategoryAlreadyExistsError(
-                            message=f"Subcategories '{', '.join(existing_titles)}' already exist"
-                        )
-                    )
-
-                subcategories_orm = []
-                user_subcategories_orm = []
-
-                for subcat in categories_data.subcategories:
-                    subcategories_orm.append(
-                        SubCategory(
-                            subcategory_id=subcat.uuid,
-                            title=subcat.title,
-                            added_by_users=True,
-                            category_id=category_id,
-                        )
-                    )
-                    user_subcategories_orm.append(
-                        UserSubCategory(user_id=user_id, subcategory_id=subcat.uuid)
-                    )
-
-                    session.add_all(subcategories_orm)
-                    session.add_all(user_subcategories_orm)
-
-                    await session.commit()
-
-        # Background process to create records in pinecone remaining
-
+            )
         # Return updated user categories
         return await self.get_user_categories(user_id=user_id, session=session)
+
 
     async def get_user_subcategories_id(
         self, user_id: str, session: AsyncSession
@@ -779,4 +804,3 @@ class NewsDBService:
             )
         result = await session.execute(statement)
         return result.scalars().all()
-
