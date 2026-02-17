@@ -3,7 +3,7 @@ import asyncio
 from loguru import logger
 from typing import Optional
 
-from app.news_service.types import CategoriesData, ClassifiedCategory
+from app.news_service.types import CategoriesData
 from app.ai.components.llms import UseLLMsGroq, GroqModelEnum
 
 
@@ -51,9 +51,9 @@ class AiCategoryClassifier:
         model: GroqModelEnum = GroqModelEnum.GPT_OSS_120B,
         categories_data: Optional[CategoriesData] = None,
         temperature: float = 0.9,
-    ) -> ClassifiedCategory:
+    ) -> dict:
         """Classifies the News Title and returns the response returned by AI model as
-        ```python ClassifiedCategory
+        ```python
         """
         await asyncio.sleep(3)  # To avoid rate limiting errors
         final_category_data: CategoriesData = (
@@ -78,5 +78,4 @@ class AiCategoryClassifier:
             logger.error("LLM is not able to produce JSON serializable response.")
             raise e
 
-        category = ClassifiedCategory(**classified_response)
-        return category
+        return classified_response

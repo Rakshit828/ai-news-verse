@@ -46,6 +46,11 @@ class PineconeInitializer:
 
         pinecone_records: list[PrimaryCategoryRecord] = []
         canonical_topics_records: list[TopicKeywordRecord] = []
+        subcategories: list[str] = [
+            subcategory.title
+            for category in self.categories_data.categories_data
+            for subcategory in category.subcategories
+        ]
         for category in self.categories_data.categories_data:
             canonical_name: CanonicalName = (
                 await self.topic_description_generator.generate_canonical_name(
@@ -60,12 +65,15 @@ class PineconeInitializer:
                 )
             )
             for subcategory in category.subcategories:
+                subcategories.remove(subcategory.title)
                 await asyncio.sleep(3)
+
                 topic_description: TopicDescription = (
                     await self.topic_description_generator.generate_topic_description(
-                        topic=subcategory.title
+                        topic=subcategory.title, other_topics=subcategories
                     )
                 )
+                subcategories.append(subcategory.title)
                 pinecone_records.append(
                     PrimaryCategoryRecord(
                         _id=str(uuid.uuid4()),

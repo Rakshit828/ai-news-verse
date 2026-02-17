@@ -23,8 +23,8 @@ class VDBCategoryClassifier:
 
     async def run(self, title: str) -> ClassificationResponse:
         response = {
-            "app-defined": [],
-            "user-defined": [],
+            "app_defined": dict(),
+            "user_defined": list(),
         }
 
         app_records: list[PrimaryCategoryRecordResponse] = (
@@ -40,11 +40,11 @@ class VDBCategoryClassifier:
 
         app_record_score = app_records[0]["_score"]
 
-        response["app-defined"] = {
+        response["app_defined"] = {
             "category_id": app_records[0]["fields"]["category_id"],
             "subcategory_id": app_records[0]["fields"]["subcategory_id"],
         }
-        response["user-defined"] = [
+        response["user_defined"] = [
             {
                 "category_id": record["fields"]["category_id"],
                 "subcategory_id": record["fields"]["subcategory_id"],
@@ -53,7 +53,7 @@ class VDBCategoryClassifier:
         ]
         
         if len(response) == 0:
-            response["user-defined"] = None
+            response["user_defined"] = None
 
         return response
 

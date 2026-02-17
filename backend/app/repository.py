@@ -14,7 +14,6 @@ from app.news_service.sources import (
     GoogleService,
     HackernoonService,
 )
-from app.news_service.components.classifier import AiCategoryClassifier
 from app.ai.pipeline.news_title_classification import (
     VDBCategoryClassifier,
     ClassificationResponse,
@@ -84,7 +83,6 @@ class NewsRepository:
 
     async def fetch_classify_and_save_articles(
         self,
-        session: AsyncSession,
         source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"],
         cutoff_hours: int = 24,
         commit_on_each: bool = False,
@@ -114,11 +112,14 @@ class NewsRepository:
             return 0
 
         all_guids = {entry.guid for entry in entries}
-        all_exising_guids = await self.db.get_all_guids(
-            session=session,
-            source=self.current_service.get_source(),
-            cutoff_hours=cutoff_hours,
-        )
+
+        async for session in get_session():
+            all_exising_guids = await self.db.get_all_guids(
+                session=session,
+                source=self.current_service.get_source(),
+                cutoff_hours=cutoff_hours,
+            )
+
         already_existing = set(all_exising_guids).intersection(all_guids)
 
         logger.info(f"{len(already_existing)} entires already existed.")
@@ -135,23 +136,27 @@ class NewsRepository:
                     entry=entry, scrape_content=scrape_content, classify=classify
                 )
                 if service_article is not None:
-                    await self.db.create_article(article=service_article, session=session)
+                    async for session in get_session():
+                        await self.db.create_article(article=service_article, session=session)
+                        logger.info(f"Article saved: {service_article.title}")
                 no_of_articles = no_of_articles + 1
             return no_of_articles
 
         else:
-
+            
             classified_articles: List[ServiceArticle] = []
             for entry in entries:
                 service_article: ServiceArticle = await self.process_entry(
                     entry=entry, scrape_content=scrape_content, classify=classify
                 )
+                logger.info(f"Article processed: {service_article.title}")
 
                 if service_article is not None:
                     classified_articles.append(service_article)
 
             if classified_articles:
-                await self.db.bulk_create_articles(classified_articles, session)
+                async for session in get_session():
+                    await self.db.bulk_create_articles(classified_articles, session)
 
             return len(classified_articles)
 
@@ -168,27 +173,18 @@ async def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:
     return rss_urls
 
 
-async def init_repository(
-    classifier: Literal["ai", "vector_db"] = "vector_db",
-) -> NewsRepository:
+async def init_repository() -> NewsRepository:
     db = NewsDBService()
     async for session in get_session():
-        categories_data = await db.category_service.get_categories_data(session=session)
         subcategory_titles = await db.category_service.get_subcategory_column(
             column="title", session=session
         )
-
-    categories_data_json = categories_data.model_dump_json()
 
     google_rss_urls: list[str] = await contruct_google_rss_urls(
         subcategory_titles=subcategory_titles
     )
 
-    classifier = (
-        AiCategoryClassifier(categories_data=categories_data_json)
-        if classifier == "ai"
-        else VDBCategoryClassifier()
-    )
+    classifier = await VDBCategoryClassifier.create()
     openai = await OpenAiService.create()
     google = await GoogleService.create(rss_urls=google_rss_urls)
     anthropic = await AnthropicService.create()
@@ -207,14 +203,14 @@ async def init_repository(
 if __name__ == "__main__":
 
     async def main():
-        repository: NewsRepository = await init_repository(classifier="ai")
-        async for session in get_session():
-            await repository.fetch_classify_and_save_articles(
-                session=session,
-                commit_on_each=False,
-                source="ANTHROPIC",
-                scrape_content=False,
-                cutoff_hours=24,
-            )
+        repository: NewsRepository = await init_repository()
+
+        await repository.fetch_classify_and_save_articles(
+            source="ANTHROPIC",
+            cutoff_hours=1000,
+            commit_on_each=True,
+            scrape_content=False,
+            classify=True,
+        )
 
     asyncio.run(main())

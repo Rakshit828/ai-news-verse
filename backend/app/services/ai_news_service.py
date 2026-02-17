@@ -4,6 +4,7 @@ from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
 from sqlalchemy.exc import IntegrityError
 from typing import Sequence, List, Literal, Tuple
 import json
+import uuid
 import asyncio
 from uuid import UUID
 from datetime import datetime, timezone, time, timedelta
@@ -102,6 +103,7 @@ class CategoriesDBService(BaseDBInteractions):
             "r",
             encoding="utf-8",
         ) as f:
+
             categories_data = json.load(f)["categories"]
 
             category_rows = []
@@ -110,7 +112,7 @@ class CategoriesDBService(BaseDBInteractions):
             for category in categories_data:
                 category_rows.append(
                     {
-                        "uuid": category["uuid"],
+                        "category_id": uuid.uuid4(),
                         "title": category["title"],
                     }
                 )
@@ -118,9 +120,9 @@ class CategoriesDBService(BaseDBInteractions):
                 for sub in category["subcategories"]:
                     subcategory_rows.append(
                         {
-                            "uuid": sub["uuid"],
+                            "subcategory_id": uuid.uuid4(),
                             "title": sub["title"],
-                            "category_id": category["uuid"],
+                            "category_id": category_rows[-1]['category_id'],
                         }
                     )
 
@@ -137,6 +139,7 @@ class CategoriesDBService(BaseDBInteractions):
                 )
 
             await session.commit()
+
 
     async def get_categories_data(
         self, session: AsyncSession
@@ -689,13 +692,13 @@ class NewsDBService:
 
         article_dict: dict = article.model_dump()
         classification_response: ClassificationResponse = article_dict.pop(
-            key="classification"
+            "classification"
         )
 
         article_orm = Articles(
-            **classification_response,
-            category_id=classification_response["app_defined"][0]["category_id"],
-            subcategory_id=classification_response["app_defined"][0]["subcategory_id"],
+            **article_dict,
+            category_id=classification_response["app_defined"]["category_id"],
+            subcategory_id=classification_response["app_defined"]["subcategory_id"],
         )
         if classification_response["user_defined"] is not None:
             user_defined_classification: list[UserDefinedArticleClassification] = [
@@ -710,7 +713,6 @@ class NewsDBService:
             session.add(article_orm)
             if len(user_defined_classification) != 0:
                 session.add_all(user_defined_classification)
-            await session.commit()
 
         return
 
@@ -725,15 +727,13 @@ class NewsDBService:
         for article in articles:
             article_dict: dict = article.model_dump()
             classification_response: ClassificationResponse = article_dict.pop(
-                key="classification"
+                "classification"
             )
 
             article_orm = Articles(
-                **classification_response,
-                category_id=classification_response["app_defined"][0]["category_id"],
-                subcategory_id=classification_response["app_defined"][0][
-                    "subcategory_id"
-                ],
+                **article_dict,
+                category_id=classification_response["app_defined"]["category_id"],
+                subcategory_id=classification_response["app_defined"]["subcategory_id"],
             )
 
             article_orms.append(article_orm)
@@ -748,12 +748,12 @@ class NewsDBService:
                 ]
                 classification_orms.append(user_defined_classification)
 
+        # commit is automatically handled by commit.
         async with session.begin():
             session.add_all(article_orms)
             if len(classification_orms) != 0:
                 for classification_orm in classification_orms:
                     session.add_all(classification_orm)
-            session.commit()
 
         return
 
@@ -780,16 +780,3 @@ class NewsDBService:
         result = await session.execute(statement)
         return result.scalars().all()
 
-
-async def main():
-    from app.db.dependencies import get_session
-
-    category_services = CategoriesDBService()
-    news_services = NewsDBService()
-    async for session in get_session():
-        # await category_services._initialize_categories(session)
-        await category_services.get_categories_data(session)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

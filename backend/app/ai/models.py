@@ -7,7 +7,7 @@ class CategoryResponse(TypedDict):
     subcategory_id: str
 
 class ClassificationResponse(TypedDict):
-    app_defined: list[CategoryResponse]
+    app_defined: CategoryResponse
     user_defined: list[CategoryResponse] | None = None
 
 class PrimaryCategoryRecord(TypedDict):

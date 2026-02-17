@@ -62,7 +62,7 @@ class PineconeClient:
             )
             subcategory = result["result"]["hits"][0]
             logger.debug(f"Subcategory from pinecone: {subcategory}")
-            if subcategory["_score"] >= 0.9:
+            if subcategory["_score"] >= 0.4:
                 return SubcategoryCheckResponse(
                     category_id=subcategory["fields"]["category_id"],
                     subcategory_id=subcategory["fields"]["subcategory_id"],
@@ -89,7 +89,7 @@ class PineconeClient:
             )
             category = result["result"]["hits"][0]
             logger.debug(f"Category from pinecone: {category}")
-            if category["_score"] >= 0.9:
+            if category["_score"] >= 0.4:
                 return CategoryCheckResponse(
                     category_id=category["fields"]["category_id"],
                     content=category["fields"]["content"],
