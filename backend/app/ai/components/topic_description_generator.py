@@ -128,7 +128,7 @@ class TopicDescriptionGenerator:
         topic: str,
         model: GroqModelEnum = GroqModelEnum.GPT_OSS_120B,
         temperature: float = 0.9,
-    ) -> TopicDescription:
+    ) -> CanonicalName:
         """Returns the ai generated canonical name from given topic."""
 
         logger.info(f"Generating canonical name for topic: {topic}, using {model}")

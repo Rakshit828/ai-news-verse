@@ -4,6 +4,7 @@ from app.ai.models import (
     PrimaryCategoryRecordResponse,
     SubcategoryCheckResponse,
     CategoryCheckResponse,
+    TopicKeywordRecordResponse
 )
 from app.config import CONFIG
 
@@ -55,7 +56,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
-                    "inputs": {"text": f"{subcategory}"},
+                    "inputs": {"content": f"{subcategory}"},
                     "top_k": 1,
                     "filter": {"subcategory_id": {"$exists": True}},
                 },
@@ -82,7 +83,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
-                    "inputs": {"text": f"{category}"},
+                    "inputs": {"content": f"{category}"},
                     "top_k": 1,
                     "filter": {"subcategory_id": {"$exists": False}},
                 },
@@ -101,6 +102,28 @@ class PineconeClient:
         except Exception as e:
             raise e
 
+    async def get_relevant_canonical_topics(self, topic: str, k: int = 4) -> List[TopicKeywordRecordResponse]:
+        try:
+            result = await self.index.search(
+                namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
+                query={
+                    "inputs": {"content": f"{topic}"},
+                    "top_k": k,
+                    "filter": {"subcategory_id": {"$exists": True}},
+                },
+                fields=["content"],
+            )
+            canonical_topics_record: List[TopicKeywordRecordResponse] = result['result']['hits']
+            logger.debug(
+                f"Relevant subcategories from pinecone: {canonical_topics_record}"
+            )
+            return canonical_topics_record
+        
+        except PineconeApiException as exc:
+            raise exc
+        except Exception as e:
+            raise e
+
     async def get_relevant_title_records(
         self, title: str, namespace: str, k: int = 10
     ) -> List[PrimaryCategoryRecordResponse]:
@@ -114,7 +137,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=namespace,
                 query={
-                    "inputs": {"text": f"{title}"},
+                    "inputs": {"content": f"{title}"},
                     "top_k": k,
                 },
                 fields=["topic", "category_id", "subcategory_id"],

@@ -1,12 +1,11 @@
-from sqlalchemy import select, delete, insert
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
-from sqlalchemy.exc import IntegrityError
-from typing import Sequence, List, Literal, Tuple
 import json
 import uuid
 import asyncio
 from uuid import UUID
+from sqlalchemy import select, delete, insert
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
+from typing import Sequence, List, Literal, Tuple
 from datetime import datetime, timezone, time, timedelta
 
 
@@ -43,17 +42,35 @@ from app.exceptions import (
     SubCategoryAlreadyExistsError,
     CategoryNotFoundError,
     SubCategoryNotFoundError,
+    NotMeaningfulTopicError,
 )
 from app.news_service.types import ServiceArticle
 from app.ai.models import (
     ClassificationResponse,
     CategoryCheckResponse,
     SubcategoryCheckResponse,
+    TopicKeywordRecordResponse,
 )
-from app.ai.components.pinecone_db import PineconeClient
-
+from app.ai.components.pinecone_db import (
+    PineconeClient,
+    TopicKeywordRecord,
+    PrimaryCategoryRecord,
+)
+from app.ai.components.topic_description_generator import (
+    TopicDescriptionGenerator,
+    TopicDescription,
+    CanonicalName,
+)
+from app.constants import (
+    PINECONE_APPLICATION_CATEGORY_NAMESPACE,
+    PINECONE_CANONICAL_TOPIC_NAMESPACE,
+    PINECONE_USER_CATEGORY_NAMESPACE,
+)
 
 from loguru import logger
+
+
+TOPIC_DESCRIPTION_GENERATOR = TopicDescriptionGenerator()
 
 
 class BaseDBInteractions:
@@ -403,7 +420,7 @@ class CategoriesDBService(BaseDBInteractions):
     async def create_custom_category(
         self,
         user_id: str,
-        category_data: CreateCustomCategoryDataModel,
+        category_data: CreateCustomCategoryModel,
         session: AsyncSession,
         pinecone_client: PineconeClient,
     ) -> ResponseCategoryDataModel:
@@ -453,21 +470,40 @@ class CategoriesDBService(BaseDBInteractions):
         # Now that the both checks have passed, the category really doesn't exists and we are creating
         # new one.
         async with session.begin():
-            new_category = Category(
-                title=category_data.title,
-                added_by_users=True,
+            # Checking for the validity.
+            result: CanonicalName = (
+                await TOPIC_DESCRIPTION_GENERATOR.generate_canonical_name(
+                    topic=new_category.title
+                )
             )
-            session.add(new_category)
-            session.add(
-                UserCategory(user_id=user_id, category_id=new_category.category_id)
-            )
+            if result.is_valid is False:
+                raise AppError(NotMeaningfulTopicError())
+            else:
+                new_category = Category(
+                    title=category_data.title,
+                    added_by_users=True,
+                )
+                await pinecone_client.upsert_records(
+                    [
+                        TopicKeywordRecord(
+                            id=str(uuid.uuid4()),
+                            content=result.canonical_name,
+                            category_id=new_category.category_id,
+                            subcategory_id=None,
+                        )
+                    ],
+                    upsert_in=PINECONE_CANONICAL_TOPIC_NAMESPACE,
+                )
+                session.add(new_category)
+                session.add(
+                    UserCategory(user_id=user_id, category_id=new_category.category_id)
+                )
 
         category_data_response: ResponseCategoryDataModel = (
             await self.get_user_categories(user_id=user_id, session=session)
         )
 
         return category_data_response
-
 
     async def create_custom_subcategory(
         self,
@@ -540,21 +576,59 @@ class CategoriesDBService(BaseDBInteractions):
             )
 
         async with session.begin():
-
-            new_subcategory = SubCategory(
-                title=subcategory_data.title,
-                added_by_users=True,
-                category_id=category_id,
-            )
-            session.add(new_subcategory)
-            session.add(
-                UserSubCategory(
-                    user_id=user_id, subcategory_id=new_subcategory.subcategory_id
+            pinecone_result: List[TopicKeywordRecordResponse] = (
+                await pinecone_client.get_relevant_canonical_topics(
+                    topic=subcategory_data.title, k=5
                 )
             )
+            topics_list: list[str] = [
+                subcat_field["fields"]["content"] for subcat_field in pinecone_result
+            ]
+            result: TopicDescription = (
+                await TOPIC_DESCRIPTION_GENERATOR.generate_topic_description(
+                    topic=subcategory_data.title, other_topics=topics_list
+                )
+            )
+            if result.is_valid is False:
+                raise AppError(NotMeaningfulTopicError())
+            else:
+                new_subcategory = SubCategory(
+                    title=subcategory_data.title,
+                    added_by_users=True,
+                    category_id=category_id,
+                )
+                await pinecone_client.upsert_records(
+                    [
+                        PrimaryCategoryRecord(
+                            id=str(uuid.uuid4()),
+                            content=result.description,
+                            topic=result.canonical_name,
+                            category_id=category_id,
+                            subcategory_id=new_subcategory.subcategory_id,
+                        )
+                    ],
+                    upsert_in=PINECONE_USER_CATEGORY_NAMESPACE,
+                )
+                await pinecone_client.upsert_records(
+                    [
+                        TopicKeywordRecord(
+                            id=str(uuid.uuid4()),
+                            content=result.canonical_name,
+                            category_id=category_id,
+                            subcategory_id=new_subcategory.subcategory_id,
+                        )
+                    ],
+                    upsert_in=PINECONE_CANONICAL_TOPIC_NAMESPACE,
+                )
+
+                session.add(new_subcategory)
+                session.add(
+                    UserSubCategory(
+                        user_id=user_id, subcategory_id=new_subcategory.subcategory_id
+                    )
+                )
         # Return updated user categories
         return await self.get_user_categories(user_id=user_id, session=session)
-
 
     async def get_user_subcategories_id(
         self, user_id: str, session: AsyncSession

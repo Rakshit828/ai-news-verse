@@ -33,7 +33,7 @@
 
 ### POST: /api/v1/news/category/custom
 **Purpose**: Should create the custom category defined by the user.
-**State**: Pending (generation of canonical name remains.)
+**State**: Finished
 **Tested**: False
 **Implementation Plan**: 
 - Should check for the existence of the category (includes db check and VectorDB check too.)
@@ -43,7 +43,7 @@
 
 ### POST: /api/v1/news/subcategory/custom
 **Purpose**: Should create the custom subcategory on the given category.
-**State**: Pending (generation of canonical name remains.)
+**State**: Finished
 **Tested**: False
 **Implementation Plan**: 
 - Should check for the existence of the subcategory (includes db check and VectorDB check too.)
