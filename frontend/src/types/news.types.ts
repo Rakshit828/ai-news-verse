@@ -1,60 +1,87 @@
-// Types
-export interface Subcategory {
-  subcategory_id: string;
-  title: string;
+// src/types/news.types.ts
+
+// ─── Category / Subcategory ───────────────────────────────────────────────────
+
+export interface SubCategory {
+  subcategory_id: string
+  title: string
 }
 
 export interface Category {
-  category_id: string;
-  title: string;
-  subcategories: Subcategory[];
+  category_id: string
+  title: string
+  subcategories: SubCategory[]
 }
 
-
-export interface CategoriesData {
-  categories: Category[];
+export interface CategoryDataResponse {
+  categories_data: Category[]
 }
 
-
-export interface NewsItem {
-  id: number;
-  title: string;
-  url: string;
-  description: string;
-  category: string;
-  subcategory: string;
+// Payloads for setting / updating user categories
+export interface SetCategoriesData {
+  category_id: string
+  subcategories: string[] // subcategory UUIDs
 }
 
-// Types for API request
-export interface SetCategorySchema {
-  category_id: string;
-  subcategories: string[];
+export interface SetUserCategoriesPayload {
+  categories_data: SetCategoriesData[]
 }
 
-export interface SetCategoriesUsers {
-  categories_data: SetCategorySchema[];
+export interface UpdateUserCategoriesPayload {
+  categories_data: SetCategoriesData[]
 }
 
+// ─── Custom Category / Subcategory Creation ───────────────────────────────────
 
-export interface SingleNews{
-  title: string;
-  url: string;
-  description: string;
-  category: string;
-  subcategory: string
+export interface CreateCustomCategoryPayload {
+  title: string
+}
+
+export interface CreateCustomSubcategoryPayload {
+  title: string
+  category_id: string
+}
+
+/** Backend response when the exact category already belongs to another user */
+export interface CategoryAlreadyExistsResponse {
+  category_id: string
+  category_title: string
+}
+
+/** Backend response when a semantically similar category exists */
+export interface SimilarCategoryExistsResponse {
+  category_id: string
+  category_title: string
+}
+
+/** Backend response when the exact subcategory already exists */
+export interface SubcategoryAlreadyExistsResponse {
+  subcategory_id: string
+  subcategory_title: string
+}
+
+/** Backend response when a semantically similar subcategory exists */
+export interface SimilarSubcategoryExistsResponse {
+  subcategory_id: string
+  subcategory_title: string
+}
+
+// ─── News / Articles ──────────────────────────────────────────────────────────
+
+export type NewsSource = 'GOOGLE' | 'ANTHROPIC' | 'OPENAI' | 'HACKERNOON'
+
+export interface Article {
+  title: string
+  url: string
+  description: string
+  category_id: string | null
+  subcategory_id: string | null
+  source: NewsSource
 }
 
 export interface TodayNewsResponse {
-  google: SingleNews[];
-  anthropic: SingleNews[];
-  openai: SingleNews[];
-}
-
-
-export interface GetMyCategoriesResponse{
-  subcategories: string[];
-}
-
-export interface SetMyCategoriesResponse{
-  subcategories: string[];
+  google?: Article[]
+  anthropic?: Article[]
+  openai?: Article[]
+  hackernoon?: Article[]
 }

@@ -1,5 +1,5 @@
 services:
-  app:
+  news-service-app:
     build: .
     env_file:
       - .env

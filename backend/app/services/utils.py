@@ -10,5 +10,8 @@ async def safely_run_controllers(func: Callable, **kwargs):
         result = await func(**kwargs)
         return result
     except Exception as e:
-        logger.error(str(e))
+        if isinstance(e, AppError):
+            raise e
+        logger.error(f"ERROR: {str(e)}")
+
         raise AppError(UnexpectedErrorInController())

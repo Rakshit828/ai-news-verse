@@ -49,38 +49,6 @@ class ResponseCategoryDataModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-class CategoryAlreadyExistsResponse(BaseModel):
-    """Use when category already exists but doesn't belong to the user."""
-
-    category_id: UUID
-    category_title: str
-    model_config = ConfigDict(extra="ignore")
-
-
-class SimilarCategoryExistsResponse(BaseModel):
-    """Use when category already exists but doesn't belong to the user."""
-
-    category_id: UUID
-    category_title: str
-    model_config = ConfigDict(extra="ignore")
-
-
-class SubcategoryAlreadyExistsResponse(BaseModel):
-    """Use when subcategory already exists but doesn't belong to the user."""
-
-    subcategory_id: UUID
-    subcategory_title: str
-    model_config = ConfigDict(extra="ignore")
-
-
-class SimilarSubcategoryExistsResponse(BaseModel):
-    """Use when subcategory already exists but doesn't belong to the user."""
-
-    subcategory_id: UUID
-    subcategory_title: str
-    model_config = ConfigDict(extra="ignore")
-
-
 # For setting and updating the categories
 class SetCategoriesData(BaseModel):
     category_id: UUID
@@ -153,10 +121,50 @@ class HackernoonResponse(BaseArticleResponse):
     source: str = "HACKERNOON"
 
 
+
+
+# Endpoint responses.
+
 class TodayNewsResponse(BaseModel):
     google: Tuple[GoogleNewsResponse, ...] | None = None
     anthropic: Tuple[AnthropicNewsResponse, ...] | None = None
     openai: Tuple[OpenaiNewsResponse, ...] | None = None
     hackernoon: Tuple[HackernoonResponse, ...] | None = None
 
+    model_config = ConfigDict(extra="ignore")
+
+class CategoryDataResponse(BaseModel):
+    """Response model for the endpoint."""
+    # THis is created to avoid the above model_validator execution in response serialization.
+    categories_data: list[ResponseCategoryData]
+
+class CategoryAlreadyExistsResponse(BaseModel):
+    """Use when category already exists but doesn't belong to the user."""
+
+    category_id: str
+    category_title: str
+    model_config = ConfigDict(extra="ignore")
+
+
+class SimilarCategoryExistsResponse(BaseModel):
+    """Use when category already exists but doesn't belong to the user."""
+
+    category_id: str
+    category_title: str
+    model_config = ConfigDict(extra="ignore")
+
+
+class SubcategoryAlreadyExistsResponse(BaseModel):
+    """Use when subcategory already exists but doesn't belong to the user."""
+
+    subcategory_id: str
+    subcategory_title: str
+    model_config = ConfigDict(extra="ignore")
+
+
+class SimilarSubcategoryExistsResponse(BaseModel):
+    """Use when subcategory already exists but doesn't belong to the user."""
+
+    subcategory_id: str
+    subcategory_title: str
     model_config = ConfigDict(extra="ignore")

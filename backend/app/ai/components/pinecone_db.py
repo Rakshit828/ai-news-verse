@@ -56,7 +56,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
-                    "inputs": {"content": f"{subcategory}"},
+                    "inputs": {"text": f"{subcategory}"},
                     "top_k": 1,
                     "filter": {"subcategory_id": {"$exists": True}},
                 },
@@ -64,7 +64,7 @@ class PineconeClient:
             )
             subcategory = result["result"]["hits"][0]
             logger.debug(f"Subcategory from pinecone: {subcategory}")
-            if subcategory["_score"] >= 0.4:
+            if subcategory["_score"] >= 0.35:
                 return SubcategoryCheckResponse(
                     category_id=subcategory["fields"]["category_id"],
                     subcategory_id=subcategory["fields"]["subcategory_id"],
@@ -83,7 +83,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
-                    "inputs": {"content": f"{category}"},
+                    "inputs": {"text": f"{category}"},
                     "top_k": 1,
                     "filter": {"subcategory_id": {"$exists": False}},
                 },
@@ -91,7 +91,7 @@ class PineconeClient:
             )
             category = result["result"]["hits"][0]
             logger.debug(f"Category from pinecone: {category}")
-            if category["_score"] >= 0.4:
+            if category["_score"] >= 0.35:
                 return CategoryCheckResponse(
                     category_id=category["fields"]["category_id"],
                     content=category["fields"]["content"],
@@ -107,7 +107,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
-                    "inputs": {"content": f"{topic}"},
+                    "inputs": {"text": f"{topic}"},
                     "top_k": k,
                     "filter": {"subcategory_id": {"$exists": True}},
                 },
@@ -137,7 +137,7 @@ class PineconeClient:
             result = await self.index.search(
                 namespace=namespace,
                 query={
-                    "inputs": {"content": f"{title}"},
+                    "inputs": {"text": f"{title}"},
                     "top_k": k,
                 },
                 fields=["topic", "category_id", "subcategory_id"],

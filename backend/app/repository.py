@@ -23,6 +23,35 @@ from app.ai.pipeline.news_title_classification import (
 class InvalidArgument(Exception):
     pass
 
+def deduplicate(entries: dict):
+    seen = set()
+    unique_entries = []
+    for entry in entries:
+        guid = entry["guid"]
+        if guid not in seen:
+            seen.add(guid)
+            unique_entries.append(entry)
+
+    entries = unique_entries
+    return entries
+
+def check_for_unique_titles(entries):
+    # splitting by '-' separte title from source.
+    seen = set()
+    unique_entries = []
+    for entry in entries:
+        splitted = entry["title"].split("-")
+        if len(splitted) != 1:
+            splitted.pop(-1)
+        title_without_src = "-".join(splitted).strip()
+        if title_without_src not in seen:
+            entry["title"] = title_without_src
+            seen.add(title_without_src)
+            unique_entries.append(entry)
+
+    entries = unique_entries
+    return entries
+
 
 class NewsRepository:
     def __init__(
@@ -79,7 +108,7 @@ class NewsRepository:
         )
 
         return service_article
-
+    
 
     async def fetch_classify_and_save_articles(
         self,
@@ -111,7 +140,16 @@ class NewsRepository:
             print(f"No new entries found for {self.current_service.__class__.__name__}")
             return 0
 
-        all_guids = {entry.guid for entry in entries}
+        # ---- ADD DEDUPLICATION HERE ----
+        unique_entries = deduplicate(entries)
+        if source == 'GOOGLE':
+            unique_entries = check_for_unique_titles(unique_entries)
+        # --------------------------------
+
+        entries = unique_entries
+
+        all_guids = {entry['guid'] for entry in entries}
+        logger.debug(f"Scraped GUIDs: {all_guids}")
 
         async for session in get_session():
             all_exising_guids = await self.db.get_all_guids(
@@ -122,10 +160,10 @@ class NewsRepository:
 
         already_existing = set(all_exising_guids).intersection(all_guids)
 
-        logger.info(f"{len(already_existing)} entires already existed.")
+        logger.debug(f"{len(already_existing)} entires already existed.")
 
         # This creates all the valid guids to be stored in the db
-        entries = [entry for entry in entries if entry.guid not in already_existing]
+        entries = [entry for entry in entries if entry['guid'] not in already_existing]
 
         logger.info(f"Total entries to be fetched: {len(entries)}")
 
@@ -205,12 +243,13 @@ if __name__ == "__main__":
     async def main():
         repository: NewsRepository = await init_repository()
 
-        await repository.fetch_classify_and_save_articles(
-            source="ANTHROPIC",
-            cutoff_hours=1000,
+        total_articles: int = await repository.fetch_classify_and_save_articles(
+            source="OPENAI",
+            cutoff_hours=100000,
             commit_on_each=True,
             scrape_content=False,
             classify=True,
         )
+        logger.debug(f"{total_articles} articles are saved in the DB.")
 
     asyncio.run(main())

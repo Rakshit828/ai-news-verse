@@ -46,7 +46,6 @@ class Category(Base):
     category_id: Mapped[UUID] = mapped_column(
         pg.UUID(as_uuid=True),
         primary_key=True,
-        default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
     title: Mapped[str] = mapped_column(pg.VARCHAR(50), nullable=False)
@@ -69,7 +68,6 @@ class SubCategory(Base):
     subcategory_id: Mapped[UUID] = mapped_column(
         pg.UUID(as_uuid=True),
         primary_key=True,
-        default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
     title: Mapped[str] = mapped_column(pg.VARCHAR(50), nullable=False)
