@@ -9,7 +9,6 @@ class Config(BaseSettings):
     ACCESS_TOKEN_EXPIRY_MINUTES: int
 
     CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
 
     PINECONE_API_KEY: str
     PINECONE_HOST: str

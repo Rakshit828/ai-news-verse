@@ -47,8 +47,6 @@ class Articles(Base):
 class UserDefinedArticleClassification(Base):
     __tablename__ = "user_defined_article_classification"
 
-    # When there are two primary key, it is referred to as composite key. So the pair of keys
-    # must be unique. One key can repeat.
 
     article_id: Mapped[str] = mapped_column(
         ForeignKey("articles.guid", ondelete="CASCADE"), primary_key=True

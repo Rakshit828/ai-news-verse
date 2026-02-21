@@ -5,32 +5,53 @@ from app.config import CONFIG
 app = Celery(
     "celery_app",
     broker=CONFIG.CELERY_BROKER_URL,
-    backend=CONFIG.CELERY_RESULT_BACKEND
 )
 
-app.autodiscover_tasks()
+app.autodiscover_tasks(['app.background_tasks'])
 
 
 # Optional global configuration
 app.conf.update(
-    result_expires=3600,  # Time in seconds after which results expire
     task_track_started=True,  # Track when tasks start
     task_serializer='json',  # Options: json, pickle, msgpack
-    result_serializer='json',  # Options: json, pickle, msgpack
     accept_content=['json'],  # Only accept JSON tasks
     timezone='UTC',
     enable_utc=True,
-    task_annotations={
-        '*': {'rate_limit': '10/s'}  # Limit task execution rate globally
-    },
 )
 
 
 CELERY_BEAT_SCHEDULE = {
-    "fetch-news-everyday-at-12-00": {
-        "task": "celery_app.scrape_and_store_news",
-        "schedule": crontab(hour=12, minute=0)
+    "fetch_classify_notify_google": {
+        "task": "app.background_tasks.tasks.fetch_classify_notify",
+        "schedule": crontab(hour=0, minute=0),
+        "args": ('GOOGLE',)
+    },
+    "fetch_classify_notify_openai": {
+        "task": "app.background_tasks.tasks.fetch_classify_notify",
+        "schedule": crontab(hour=0, minute=0),
+        "args": ('OPENAI',)
+    },
+    "fetch_classify_notify_anthropic": {
+        "task": "app.background_tasks.tasks.fetch_classify_notify",
+        "schedule": crontab(hour=0, minute=0),
+        "args": ('ANTHROPIC',)
+    },
+    "fetch_classify_notify_hackernoon": {
+        "task": "app.background_tasks.tasks.fetch_classify_notify",
+        "schedule": crontab(hour=0, minute=0),
+        "args": ('HACKERNOON',)
+    },
+    "test_task_every_60s": {
+        "task": "app.background_tasks.tasks.test_task",
+        "schedule": schedule(run_every=60),
+        "args": (1,)
+    },
+    "test_task_at_22_08": {
+        "task": "app.background_tasks.tasks.test_task",
+        "schedule": crontab(hour=22, minute=20),
+        "args": (2,)
     }
+
 }
 
 app.conf.beat_schedule = CELERY_BEAT_SCHEDULE
