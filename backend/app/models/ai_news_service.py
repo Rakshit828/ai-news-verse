@@ -1,7 +1,24 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Literal
 from uuid import UUID, uuid4
 from pydantic import ConfigDict
+
+
+
+# News Notification Message
+class NewNewsNotification(BaseModel):
+    guid: str
+    title: str
+    link: str
+    source: Literal['OPNEAI', 'GOOGLE', 'HACKERNOON', 'ANTHROPIC']
+    category_id: str | None = None
+    subcategory_id: str
+    description: str | None = None
+    summary: str | None = None
+
+
+    model_config = ConfigDict(extra="ignore")
+
 
 
 # Response for all category related tasks

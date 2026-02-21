@@ -1,4 +1,13 @@
-from fastapi import APIRouter, Depends, status, Request
+import asyncio
+from fastapi import (
+    APIRouter,
+    Depends,
+    status,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+)
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from typing import Union
 
@@ -15,9 +24,10 @@ from app.models.ai_news_service import (
     TodayNewsResponse,
     CategoryDataResponse,
     CategoryDataResponse,
-    ResponseCategoryDataModel
+    ResponseCategoryDataModel,
 )
 from app.services.ai_news_service import NewsDBService, CategoriesDBService
+from app.services.notification_system import PubSubSystem
 from app.ai.components.pinecone_db import PineconeClient
 from app.services.utils import safely_run_controllers
 from app.db.dependencies import get_session
@@ -29,6 +39,41 @@ news_routes = APIRouter()
 
 category_service = CategoriesDBService()
 news_service = NewsDBService()
+redis_pubsub = PubSubSystem()
+
+
+@news_routes.websocket("/ws/{user_id}")
+async def websocket_endpoint(
+    websocket: WebSocket, user_id: str, session: AsyncSession = Depends(get_session)
+):
+    logger.debug(f"Client {user_id} is trying to connect.")
+    # Accepting a connection
+    await websocket.accept()
+    logger.info(f"Client with id: {user_id} connected successfully.")
+
+    categories_data: ResponseCategoryDataModel = await safely_run_controllers(
+        func=category_service.get_user_categories, user_id=user_id, session=session
+    )
+    # Channels is a list of the user subcategories ids.
+    channels: list[str] = [
+        str(subcategory.subcategory_id)
+        for category in categories_data.categories_data
+        for subcategory in category.subcategories
+    ]
+
+    # Create a task per category
+    tasks = [
+        asyncio.create_task(redis_pubsub.subscribe_and_listen(channel, websocket))
+        for channel in channels
+    ]
+    try:
+        await asyncio.gather(*tasks)
+    except WebSocketDisconnect:
+        logger.info(f"Client with user_id: {user_id} disconnected.")
+        for task in tasks:
+            task.cancel()
+    except Exception as e:
+            logger.error(str(e))
 
 
 @news_routes.get(

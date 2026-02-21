@@ -6,7 +6,7 @@ from app.response import AppError
 from app.api.v1.auth_api import auth_routes
 from app.api.v1.news_service_api import news_routes
 from loguru import logger
-
+from app.db.redis import init_redis
 from app.ai.components.pinecone_db import init_pinecone_db, PineconeClient
 
 VERSION = "v1"
@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     pinecone_client: PineconeClient = await init_pinecone_db()
+    await init_redis()
     app.state.pinecone_client = pinecone_client
     yield
 

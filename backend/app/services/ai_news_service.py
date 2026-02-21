@@ -790,7 +790,7 @@ class NewsDBService:
         self,
         article: ServiceArticle,
         session: AsyncSession,
-    ) -> None:
+    ) -> Articles:
         user_defined_classification = []
 
         article_dict: dict = article.model_dump()
@@ -816,8 +816,8 @@ class NewsDBService:
             session.add(article_orm)
             if len(user_defined_classification) != 0:
                 session.add_all(user_defined_classification)
-
-        return
+                
+        return article_orm
 
     async def bulk_create_articles(
         self,

@@ -18,10 +18,13 @@ from app.ai.pipeline.news_title_classification import (
     VDBCategoryClassifier,
     ClassificationResponse,
 )
+from app.services.notification_system import PubSubSystem
+from app.models.ai_news_service import NewNewsNotification
 
 
 class InvalidArgument(Exception):
     pass
+
 
 def deduplicate(entries: dict):
     seen = set()
@@ -34,6 +37,7 @@ def deduplicate(entries: dict):
 
     entries = unique_entries
     return entries
+
 
 def check_for_unique_titles(entries):
     # splitting by '-' separte title from source.
@@ -75,6 +79,20 @@ class NewsRepository:
             OpenAiService | GoogleService | AnthropicService | HackernoonService
         ) = None
 
+    def _get_current_service(
+        self, source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"]
+    ) -> OpenAiService | HackernoonService | GoogleService | AnthropicService:
+        mapping = {
+            "OPENAI": self.openai,
+            "GOOGLE": self.google,
+            "ANTHROPIC": self.anthropic,
+            "HACKERNOON": self.hackernoon,
+        }
+        service = mapping.get(source)
+        if service is None:
+            raise ValueError(f"Invalid value {source} for source=")
+        return service
+
     async def check_entry(
         self,
         entry_guid: str,
@@ -85,7 +103,6 @@ class NewsRepository:
             guid=entry_guid, source=source, session=session
         )
         return False if check is None else True
-
 
     async def process_entry(
         self, entry: dict, scrape_content: bool = True, classify: bool = True
@@ -108,30 +125,57 @@ class NewsRepository:
         )
 
         return service_article
-    
+
+    async def prepare_messages_for_publishing(
+        self, articles: List[ServiceArticle]
+    ) -> List[NewNewsNotification]:
+        news: List[NewNewsNotification] = list()
+        for article in articles:
+            classification = article.classification
+            if len(classification["user_defined"]) == 0:
+                classification["user_defined"] = []
+
+            news.extend(
+                [
+                    NewNewsNotification(
+                        guid=article.guid,
+                        title=article.title,
+                        link=article.url,
+                        description=article.description,
+                        summary=article.summary,
+                        source=article.source,
+                        category_id=user_defined_cat["category_id"],
+                        subcategory_id=user_defined_cat["subcategory_id"],
+                    )
+                    for user_defined_cat in classification["user_defined"]
+                ]
+            )
+            news.append(
+                NewNewsNotification(
+                    guid=article.guid,
+                    title=article.title,
+                    link=article.url,
+                    description=article.description,
+                    summary=article.summary,
+                    source=article.source,
+                    category_id=classification["app_defined"]["category_id"],
+                    subcategory_id=classification["app_defined"]["subcategory_id"],
+                )
+            )
+        return news
 
     async def fetch_classify_and_save_articles(
         self,
         source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"],
+        pubsub: PubSubSystem = PubSubSystem(),
         cutoff_hours: int = 24,
         commit_on_each: bool = False,
         scrape_content: bool = True,
         classify: bool = True,
     ) -> int:
         """Main workflow: fetch, classify, and save articles"""
-        self.current_service = None
-        match source:
-            case "ANTHROPIC":
-                self.current_service = self.anthropic
-            case "GOOGLE":
-                self.current_service = self.google
-            case "OPENAI":
-                self.current_service = self.openai
-            case "HACKERNOON":
-                self.current_service = self.hackernoon
-            case _:
-                raise Exception("Invalid Source Input.")
-
+        self.current_service = self._get_current_service(source=source)
+        
         entries = await self.current_service.scraper.get_entries_from_rss_feed(
             cutoff_hours=cutoff_hours
         )
@@ -142,13 +186,13 @@ class NewsRepository:
 
         # ---- ADD DEDUPLICATION HERE ----
         unique_entries = deduplicate(entries)
-        if source == 'GOOGLE':
+        if source == "GOOGLE":
             unique_entries = check_for_unique_titles(unique_entries)
         # --------------------------------
 
         entries = unique_entries
 
-        all_guids = {entry['guid'] for entry in entries}
+        all_guids = {entry["guid"] for entry in entries}
         logger.debug(f"Scraped GUIDs: {all_guids}")
 
         async for session in get_session():
@@ -163,7 +207,7 @@ class NewsRepository:
         logger.debug(f"{len(already_existing)} entires already existed.")
 
         # This creates all the valid guids to be stored in the db
-        entries = [entry for entry in entries if entry['guid'] not in already_existing]
+        entries = [entry for entry in entries if entry["guid"] not in already_existing]
 
         logger.info(f"Total entries to be fetched: {len(entries)}")
 
@@ -175,13 +219,26 @@ class NewsRepository:
                 )
                 if service_article is not None:
                     async for session in get_session():
-                        await self.db.create_article(article=service_article, session=session)
-                        logger.info(f"Article saved: {service_article.title}")
+                        article: Articles = await self.db.create_article(
+                            article=service_article, session=session
+                        )
+                        logger.info(
+                            f"Article saved: {article.title}, GUID: {article.guid}"
+                        )
+
+                        # Publishing to redis.
+                        news_messages: List[NewNewsNotification] = (
+                            await self.prepare_messages_for_publishing(
+                                articles=[service_article]
+                            )
+                        )
+                        await pubsub.publish(news_messages)
+
                 no_of_articles = no_of_articles + 1
             return no_of_articles
 
         else:
-            
+
             classified_articles: List[ServiceArticle] = []
             for entry in entries:
                 service_article: ServiceArticle = await self.process_entry(
@@ -196,8 +253,12 @@ class NewsRepository:
                 async for session in get_session():
                     await self.db.bulk_create_articles(classified_articles, session)
 
-            return len(classified_articles)
+            news_messages: list[NewNewsNotification] = (
+                await self.prepare_messages_for_publishing(articles=classified_articles)
+            )
+            await pubsub.publish(news_messages)
 
+            return len(classified_articles)
 
 
 async def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:
@@ -244,7 +305,7 @@ if __name__ == "__main__":
         repository: NewsRepository = await init_repository()
 
         total_articles: int = await repository.fetch_classify_and_save_articles(
-            source="OPENAI",
+            source="ANTHROPIC",
             cutoff_hours=100000,
             commit_on_each=True,
             scrape_content=False,

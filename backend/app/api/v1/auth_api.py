@@ -57,6 +57,7 @@ auth_routes = APIRouter()
 auth_service = AuthService()
 
 
+
 @auth_routes.post(
     "/signup",
     response_model=SuccessResponse[UserResponseModel],
