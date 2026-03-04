@@ -453,4 +453,6 @@ export default function DashboardPage() {
           }
         }
       `}</style>
-    </d
+    </div>
+  );
+}
