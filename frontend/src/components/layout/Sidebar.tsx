@@ -7,35 +7,29 @@ import {
   Sun,
   Moon,
   ChevronLeft,
-  ChevronRight,
   Newspaper,
+  X,
 } from "lucide-react";
+import { useEffect } from "react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLogoutMutation } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
 
-
 interface SidebarProps {
   collapsed: boolean;
+  isMobileOpen: boolean;
   onToggle: () => void;
-  onMobileClose?: () => void;
+  onMobileClose: () => void;
 }
 
 const navItems = [
-  {
-    to: "/",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    to: "/personalization",
-    label: "Personalization",
-    icon: Settings2,
-  },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/personalization", label: "Personalization", icon: Settings2 },
 ];
 
 export default function Sidebar({
   collapsed,
+  isMobileOpen,
   onToggle,
   onMobileClose,
 }: SidebarProps) {
@@ -44,118 +38,173 @@ export default function Sidebar({
   const user = useAuthStore((s) => s.user);
   const location = useLocation();
 
-  const handleNavClick = () => {
-    onMobileClose?.();
-  };
+  // On mobile, always show labels even if desktop state is collapsed
+  const showLabels = isMobileOpen ? true : !collapsed;
+
+  const isActiveRoute = (to: string) =>
+    location.pathname === to ||
+    (to === "/" && location.pathname === "/dashboard");
+
+  // Close on ESC
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onMobileClose();
+    };
+    if (isMobileOpen) window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isMobileOpen, onMobileClose]);
+
+  // Close on route change (mobile)
+  useEffect(() => {
+    onMobileClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   return (
-    <aside
-      className="sidebar"
-      style={{
-        width: collapsed ? "var(--sidebar-collapsed)" : "var(--sidebar-width)",
-      }}
-    >
-      {/* ── Logo ── */}
-      <div className="sidebar-header">
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">
-            <Newspaper size={22} />
-          </div>
-          {!collapsed && (
-            <span className="sidebar-logo-text">AI News Verse</span>
-          )}
-        </div>
-        <button
-          className="sidebar-toggle"
-          onClick={onToggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
-      </div>
+    <>
+      {/* Backdrop */}
+      {isMobileOpen && (
+        <div className="sidebar-backdrop" onClick={onMobileClose} />
+      )}
 
-      {/* ── Navigation ── */}
-      <nav className="sidebar-nav">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.to;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={handleNavClick}
-              className={`sidebar-nav-item ${isActive ? "active" : ""}`}
+      <aside
+        className={[
+          "sidebar",
+          collapsed ? "collapsed" : "",
+          isMobileOpen ? "mobile-open" : "",
+        ].filter(Boolean).join(" ")}
+      >
+        {/* HEADER */}
+        <div className="sidebar-header">
+          <div
+            className="sidebar-logo"
+            onClick={collapsed ? onToggle : undefined}
+            style={{ cursor: collapsed ? "pointer" : "default" }}
+            title={collapsed ? "Expand sidebar" : undefined}
+          >
+            <div className="sidebar-logo-icon">
+              <Newspaper size={20} />
+            </div>
+            {showLabels && (
+              <span className="sidebar-logo-text">AI News Verse</span>
+            )}
+          </div>
+
+          {/* Desktop: collapse toggle (only when expanded) */}
+          {showLabels && (
+            <button
+              className="sidebar-toggle desktop-only"
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
             >
-              <div className="sidebar-nav-icon">
-                <item.icon size={20} />
-              </div>
-              {!collapsed && (
-                <span className="sidebar-nav-label">{item.label}</span>
-              )}
-              {isActive && <div className="sidebar-nav-indicator" />}
-            </NavLink>
-          );
-        })}
-      </nav>
-
-      {/* ── Footer ── */}
-      <div className="sidebar-footer">
-        <button
-          className="sidebar-action-btn"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-        >
-          {mode === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          {!collapsed && (
-            <span>{mode === "dark" ? "Light Mode" : "Dark Mode"}</span>
+              <ChevronLeft size={16} />
+            </button>
           )}
-        </button>
 
-        {user && !collapsed && (
-          <div className="sidebar-user-info">
-            <div className="sidebar-user-avatar">
-              {user.first_name.charAt(0)}
-              {user.last_name.charAt(0)}
-            </div>
-            <div className="sidebar-user-details">
-              <span className="sidebar-user-name">
-                {user.first_name} {user.last_name}
-              </span>
-              <span className="sidebar-user-email">{user.email}</span>
-            </div>
-          </div>
-        )}
+          {/* Mobile: close button (always visible on mobile) */}
+          <button
+            className="sidebar-close-btn mobile-only"
+            onClick={onMobileClose}
+            aria-label="Close sidebar"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-        <button
-          className="sidebar-action-btn sidebar-logout"
-          onClick={() => logout.mutate()}
-          aria-label="Log out"
-        >
-          <LogOut size={18} />
-          {!collapsed && <span>Log Out</span>}
-        </button>
-      </div>
+        {/* NAVIGATION */}
+        <nav className="sidebar-nav">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActiveRoute(item.to);
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={`sidebar-nav-item ${active ? "active" : ""}`}
+              >
+                <div className="sidebar-nav-icon">
+                  <Icon size={20} />
+                </div>
+                {showLabels && (
+                  <span className="sidebar-nav-label">{item.label}</span>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* FOOTER */}
+        <div className="sidebar-footer">
+          <button className="sidebar-action-btn" onClick={toggleTheme}>
+            <div className="sidebar-nav-icon">
+              {mode === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </div>
+            {showLabels && (
+              <span>{mode === "dark" ? "Light Mode" : "Dark Mode"}</span>
+            )}
+          </button>
+
+          {user && (
+            <div className="sidebar-user">
+              <div className="sidebar-avatar">
+                {user.first_name[0]}
+                {user.last_name[0]}
+              </div>
+              {showLabels && (
+                <div className="sidebar-user-info">
+                  <span className="sidebar-user-name">
+                    {user.first_name} {user.last_name}
+                  </span>
+                  <span className="sidebar-user-email">{user.email}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            className="sidebar-action-btn sidebar-logout"
+            onClick={() => logout.mutate()}
+          >
+            <div className="sidebar-nav-icon">
+              <LogOut size={18} />
+            </div>
+            {showLabels && <span>Log Out</span>}
+          </button>
+        </div>
+      </aside>
 
       <style>{`
+        /* ============================
+           SIDEBAR — DESKTOP
+           ============================ */
         .sidebar {
           position: fixed;
           top: 0;
           left: 0;
           height: 100vh;
-          background: var(--gradient-sidebar);
+          width: var(--sidebar-width);
+          background: var(--color-bg-sidebar);
           border-right: 1px solid var(--color-border-primary);
           display: flex;
           flex-direction: column;
-          transition: width var(--transition-normal);
-          z-index: 40;
+          transition: width 0.25s ease;
+          z-index: 200;
           overflow: hidden;
         }
 
+        .sidebar.collapsed {
+          width: var(--sidebar-collapsed);
+        }
+
+        /* ── Header ── */
         .sidebar-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 20px 16px;
+          padding: 16px;
+          min-height: 64px;
           border-bottom: 1px solid var(--color-border-secondary);
+          flex-shrink: 0;
         }
 
         .sidebar-logo {
@@ -166,9 +215,10 @@ export default function Sidebar({
         }
 
         .sidebar-logo-icon {
-          width: 38px;
-          height: 38px;
-          border-radius: var(--radius-md);
+          width: 36px;
+          height: 36px;
+          min-width: 36px;
+          border-radius: 10px;
           background: var(--gradient-accent);
           color: white;
           display: flex;
@@ -178,19 +228,23 @@ export default function Sidebar({
         }
 
         .sidebar-logo-text {
-          font-size: 17px;
-          font-weight: 700;
+          font-size: 16px;
+          font-weight: 800;
           white-space: nowrap;
           background: var(--gradient-accent);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          letter-spacing: -0.5px;
         }
 
-        .sidebar-toggle {
-          width: 28px;
-          height: 28px;
-          border-radius: var(--radius-sm);
+        /* ── Toggle & Close buttons ── */
+        .sidebar-toggle,
+        .sidebar-close-btn {
+          width: 32px;
+          height: 32px;
+          min-width: 32px;
+          border-radius: 8px;
           border: 1px solid var(--color-border-primary);
           background: var(--color-bg-secondary);
           color: var(--color-text-secondary);
@@ -198,36 +252,36 @@ export default function Sidebar({
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: all var(--transition-fast);
+          transition: 0.15s ease;
           flex-shrink: 0;
         }
 
-        .sidebar-toggle:hover {
+        .sidebar-toggle:hover,
+        .sidebar-close-btn:hover {
           background: var(--color-bg-hover);
           color: var(--color-text-primary);
         }
 
+        /* ── Nav ── */
         .sidebar-nav {
           flex: 1;
-          padding: 12px 8px;
+          padding: 16px 10px;
           display: flex;
           flex-direction: column;
           gap: 4px;
+          overflow-y: auto;
         }
 
         .sidebar-nav-item {
-          position: relative;
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 10px 12px;
-          border-radius: var(--radius-md);
+          padding: 10px 6px;
+          border-radius: 10px;
           color: var(--color-text-secondary);
           text-decoration: none;
-          font-size: 14px;
-          font-weight: 500;
-          transition: all var(--transition-fast);
+          transition: 0.15s ease;
           overflow: hidden;
+          white-space: nowrap;
         }
 
         .sidebar-nav-item:hover {
@@ -241,59 +295,53 @@ export default function Sidebar({
         }
 
         .sidebar-nav-icon {
-          width: 36px;
-          height: 36px;
+          width: 40px;
+          min-width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          border-radius: var(--radius-sm);
-        }
-
-        .sidebar-nav-item.active .sidebar-nav-icon {
-          background: var(--color-accent);
-          color: white;
-          box-shadow: 0 2px 8px var(--color-accent-glow);
         }
 
         .sidebar-nav-label {
           white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-left: 4px;
+          font-size: 14px;
+          font-weight: 600;
         }
 
-        .sidebar-nav-indicator {
-          position: absolute;
-          left: 0;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 3px;
-          height: 20px;
-          background: var(--color-accent);
-          border-radius: 0 var(--radius-full) var(--radius-full) 0;
-        }
-
+        /* ── Footer ── */
         .sidebar-footer {
-          padding: 12px 8px;
+          padding: 14px 10px;
           border-top: 1px solid var(--color-border-secondary);
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 6px;
+          flex-shrink: 0;
         }
 
         .sidebar-action-btn {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 10px 12px;
-          border-radius: var(--radius-md);
+          padding: 10px 6px;
+          border-radius: 10px;
           border: none;
           background: transparent;
           color: var(--color-text-secondary);
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          transition: all var(--transition-fast);
           width: 100%;
-          font-family: var(--font-sans);
+          overflow: hidden;
+          white-space: nowrap;
+          transition: 0.15s ease;
+        }
+
+        .sidebar-action-btn span {
+          margin-left: 4px;
         }
 
         .sidebar-action-btn:hover {
@@ -306,33 +354,36 @@ export default function Sidebar({
           color: var(--color-error);
         }
 
-        .sidebar-user-info {
+        .sidebar-user {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 12px;
-          border-radius: var(--radius-md);
+          gap: 10px;
+          padding: 10px;
+          border-radius: 12px;
           background: var(--color-bg-tertiary);
-          margin: 4px 0;
+          border: 1px solid var(--color-border-secondary);
+          overflow: hidden;
         }
 
-        .sidebar-user-avatar {
+        .sidebar-avatar {
           width: 36px;
           height: 36px;
-          border-radius: var(--radius-full);
+          min-width: 36px;
+          border-radius: 50%;
           background: var(--gradient-accent);
-          color: white;
           display: flex;
           align-items: center;
           justify-content: center;
+          color: white;
+          font-weight: 700;
           font-size: 13px;
-          font-weight: 600;
           flex-shrink: 0;
         }
 
-        .sidebar-user-details {
+        .sidebar-user-info {
           display: flex;
           flex-direction: column;
+          overflow: hidden;
           min-width: 0;
         }
 
@@ -353,12 +404,72 @@ export default function Sidebar({
           text-overflow: ellipsis;
         }
 
+        /* ============================
+           DESKTOP-ONLY / MOBILE-ONLY
+           ============================ */
+        .mobile-only {
+          display: none !important;
+        }
+
+        .desktop-only {
+          display: flex;
+        }
+
+        /* ============================
+           SIDEBAR — MOBILE (≤768px)
+           ============================ */
         @media (max-width: 768px) {
-          .sidebar-toggle {
-            display: none;
+          .desktop-only {
+            display: none !important;
+          }
+
+          .mobile-only {
+            display: flex !important;
+          }
+
+          .sidebar {
+            width: min(280px, 85vw);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 400;
+            border-right: none;
+            box-shadow: none;
+          }
+
+          .sidebar.collapsed {
+            width: min(280px, 85vw);
+          }
+
+          .sidebar.mobile-open {
+            transform: translateX(0);
+            box-shadow: 8px 0 32px rgba(0, 0, 0, 0.2);
+          }
+
+          /* On mobile, always show labels */
+          .sidebar-nav-label {
+            display: inline;
+          }
+
+          .sidebar-action-btn span {
+            display: inline;
           }
         }
+
+        /* ── Backdrop ── */
+        .sidebar-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(4px);
+          z-index: 350;
+          animation: sidebarFadeIn 0.2s ease-out;
+        }
+
+        @keyframes sidebarFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
       `}</style>
-    </aside>
+    </>
   );
 }

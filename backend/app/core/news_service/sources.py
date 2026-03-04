@@ -1,7 +1,7 @@
 import asyncio
 from app.config import CONFIG
-from app.news_service._base import BaseNewsService, InvalidScraper
-from app.news_service.components.scraper import Scraper
+from app.core.news_service._base import BaseNewsService, InvalidScraper
+from app.core.news_service.components.scraper import Scraper
 
 from app.db.schemas.ai_news_service import Source
 

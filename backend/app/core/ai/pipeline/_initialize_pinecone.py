@@ -5,7 +5,7 @@ from loguru import logger
 import sqlalchemy.exc as exc
 import uuid
 
-from app.core.ai.components.pinecone_db import init_pinecone_db, PineconeClient
+from app.core.ai.components import init_pinecone_db, PineconeClient
 from app.core.ai.models import (
     PrimaryCategoryRecord,
     TopicKeywordRecord,
@@ -16,7 +16,7 @@ from app.constants import (
     PINECONE_APPLICATION_CATEGORY_NAMESPACE,
     PINECONE_CANONICAL_TOPIC_NAMESPACE,
 )
-from app.core.ai.components.topic_description_generator import (
+from app.core.ai.components import (
     TopicDescriptionGenerator,
     TopicDescription,
     CanonicalName,

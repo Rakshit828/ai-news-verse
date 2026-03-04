@@ -1,142 +1,138 @@
 // src/layouts/MainLayout.tsx
 import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, Newspaper } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 
 export default function MainLayout() {
-    const [collapsed, setCollapsed] = useState(false);
-    const [mobileOpen, setMobileOpen] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-    useEffect(() => {
-        const check = () => {
-            const mobile = window.innerWidth < 768;
-            setIsMobile(mobile);
-            if (mobile) setCollapsed(false);
-        };
-        check();
-        window.addEventListener("resize", check);
-        return () => window.removeEventListener("resize", check);
-    }, []);
+  // Prevent background scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+  }, [mobileOpen]);
 
-    const sidebarWidth = isMobile
-        ? 0
-        : collapsed
-            ? "var(--sidebar-collapsed)"
-            : "var(--sidebar-width)";
+  return (
+    <div className="main-layout">
+      {/* ── Mobile Header ── */}
+      <header className="mobile-header">
+        <div className="mobile-logo-group">
+          <Newspaper size={20} className="mobile-logo-icon" />
+          <span className="mobile-logo-text">AI News Verse</span>
+        </div>
 
-    return (
-        <div className="main-layout">
-            {/* ── Mobile hamburger ── */}
-            {isMobile && (
-                <button
-                    className="mobile-menu-btn"
-                    onClick={() => setMobileOpen((p) => !p)}
-                    aria-label="Open menu"
-                >
-                    {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-                </button>
-            )}
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+      </header>
 
-            {/* ── Overlay ── */}
-            {isMobile && mobileOpen && (
-                <div
-                    className="mobile-overlay"
-                    onClick={() => setMobileOpen(false)}
-                />
-            )}
+      {/* ── Sidebar ── */}
+      <Sidebar
+        collapsed={collapsed}
+        isMobileOpen={mobileOpen}
+        onToggle={() => setCollapsed((p) => !p)}
+        onMobileClose={() => setMobileOpen(false)}
+      />
 
-            {/* ── Sidebar ── */}
-            <div
-                className={`sidebar-container ${isMobile ? (mobileOpen ? "mobile-open" : "mobile-closed") : ""}`}
-            >
-                <Sidebar
-                    collapsed={isMobile ? false : collapsed}
-                    onToggle={() => setCollapsed((p) => !p)}
-                    onMobileClose={() => setMobileOpen(false)}
-                />
-            </div>
+      {/* ── Content ── */}
+      <main
+        className={`main-content ${
+          collapsed ? "collapsed" : ""
+        }`}
+      >
+        <div className="content-inner">
+          <Outlet />
+        </div>
+      </main>
 
-            {/* ── Content ── */}
-            <main
-                className="main-content"
-                style={{ marginLeft: sidebarWidth }}
-            >
-                <Outlet />
-            </main>
-
-            <style>{`
+      <style>{`
         .main-layout {
           min-height: 100vh;
+          background: var(--color-bg-primary);
         }
 
-        .main-content {
-          min-height: 100vh;
-          transition: margin-left var(--transition-normal);
-          padding: 28px 32px;
+        /* ===== MOBILE HEADER ===== */
+        .mobile-header {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .mobile-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--color-bg-sidebar);
+            border-bottom: 1px solid var(--color-border-secondary);
+            z-index: 300;
+          }
+        }
+
+        .mobile-logo-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .mobile-logo-text {
+          font-weight: 800;
+          font-size: 16px;
+          background: var(--gradient-accent);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
 
         .mobile-menu-btn {
-          position: fixed;
-          top: 16px;
-          left: 16px;
-          z-index: 50;
-          width: 42px;
-          height: 42px;
-          border-radius: var(--radius-md);
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
           border: 1px solid var(--color-border-primary);
           background: var(--color-bg-secondary);
-          color: var(--color-text-primary);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          box-shadow: var(--shadow-md);
-          transition: all var(--transition-fast);
         }
 
-        .mobile-menu-btn:hover {
-          background: var(--color-bg-hover);
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+          min-height: 100vh;
+          margin-left: var(--sidebar-width);
+          padding: 32px 40px;
+          transition: margin-left 0.25s ease;
         }
 
-        .mobile-overlay {
-          position: fixed;
-          inset: 0;
-          background: var(--color-bg-overlay);
-          z-index: 35;
-          animation: fadeIn var(--transition-fast) ease-out;
+        .main-content.collapsed {
+          margin-left: var(--sidebar-collapsed);
         }
 
-        .sidebar-container.mobile-closed {
-          transform: translateX(-100%);
-          position: fixed;
-          z-index: 40;
+        .content-inner {
+          max-width: 1600px;
+          margin: 0 auto;
         }
 
-        .sidebar-container.mobile-open {
-          position: fixed;
-          z-index: 40;
-          transform: translateX(0);
-          transition: transform var(--transition-normal);
-        }
-
-        .sidebar-container.mobile-closed {
-          transition: transform var(--transition-normal);
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
+        /* ===== MOBILE CONTENT ===== */
         @media (max-width: 768px) {
           .main-content {
             margin-left: 0 !important;
-            padding: 72px 16px 24px;
+            padding: 84px 16px 40px;
           }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

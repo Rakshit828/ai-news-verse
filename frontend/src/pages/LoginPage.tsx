@@ -5,87 +5,87 @@ import { useLoginMutation } from "@/hooks/useAuth";
 import { Newspaper, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
-    const login = useLoginMutation();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
+  const login = useLoginMutation();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        login.mutate({ email, password });
-    };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    login.mutate({ email, password });
+  };
 
-    return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <div className="auth-logo">
-                    <div className="auth-logo-icon">
-                        <Newspaper size={24} />
-                    </div>
-                    <h1 className="auth-logo-text">AI News Verse</h1>
-                </div>
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-logo">
+          <div className="auth-logo-icon">
+            <Newspaper size={24} />
+          </div>
+          <h1 className="auth-logo-text">AI News Verse</h1>
+        </div>
 
-                <h2 className="auth-heading">Welcome back</h2>
-                <p className="auth-subheading">Sign in to your account</p>
+        <h2 className="auth-heading">Welcome back</h2>
+        <p className="auth-subheading">Sign in to your account</p>
 
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <div className="auth-field">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            required
-                        />
-                    </div>
-                    <div className="auth-field">
-                        <label htmlFor="password">Password</label>
-                        <div className="auth-password-wrapper">
-                            <input
-                                id="password"
-                                type={showPassword ? "text" : "password"}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                required
-                            />
-                            <button
-                                type="button"
-                                className="auth-password-toggle"
-                                onClick={() => setShowPassword((p) => !p)}
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                            >
-                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </button>
-                        </div>
-                    </div>
-                    <button
-                        type="submit"
-                        className="auth-submit"
-                        disabled={login.isPending}
-                    >
-                        {login.isPending ? (
-                            <>
-                                <Loader2 size={16} className="spinner" />
-                                Signing in...
-                            </>
-                        ) : (
-                            "Sign In"
-                        )}
-                    </button>
-                </form>
-
-                <p className="auth-switch">
-                    Don't have an account?{" "}
-                    <Link to="/signup" className="auth-switch-link">
-                        Sign up
-                    </Link>
-                </p>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="auth-field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
+          <div className="auth-field">
+            <label htmlFor="password">Password</label>
+            <div className="auth-password-wrapper">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                className="auth-password-toggle"
+                onClick={() => setShowPassword((p) => !p)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
+          </div>
+          <button
+            type="submit"
+            className="auth-submit"
+            disabled={login.isPending}
+          >
+            {login.isPending ? (
+              <>
+                <Loader2 size={16} className="spinner" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
+          </button>
+        </form>
 
-            <style>{`
+        <p className="auth-switch">
+          Don't have an account?{" "}
+          <Link to="/signup" className="auth-switch-link">
+            Sign up
+          </Link>
+        </p>
+      </div>
+
+      <style>{`
         .auth-page {
           min-height: 100vh;
           display: flex;
@@ -102,7 +102,8 @@ export default function LoginPage() {
           border: 1px solid var(--color-border-primary);
           border-radius: var(--radius-xl);
           padding: 40px 36px;
-          box-shadow: var(--shadow-lg);
+          box-shadow: var(--shadow-2xl);
+          animation: slideUp var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .auth-logo {
@@ -114,14 +115,15 @@ export default function LoginPage() {
         }
 
         .auth-logo-icon {
-          width: 42px;
-          height: 42px;
+          width: 44px;
+          height: 44px;
           border-radius: var(--radius-md);
           background: var(--gradient-accent);
           color: white;
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 4px 12px var(--color-accent-glow);
         }
 
         .auth-logo-text {
@@ -266,7 +268,26 @@ export default function LoginPage() {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+
+        @media (max-width: 480px) {
+          .auth-card {
+            padding: 28px 20px;
+          }
+
+          .auth-heading {
+            font-size: 20px;
+          }
+
+          .auth-logo-icon {
+            width: 38px;
+            height: 38px;
+          }
+
+          .auth-logo-text {
+            font-size: 18px;
+          }
+        }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

@@ -3,8 +3,8 @@ import asyncio
 from loguru import logger
 from typing import Optional
 
-from app.news_service.types import CategoriesData
-from app.ai.components.llms import UseLLMsGroq, GroqModelEnum
+from app.core.news_service.types import CategoriesData
+from app.core.ai.components.llms import UseLLMsGroq, GroqModelEnum
 
 
 class AiCategoryClassifier:

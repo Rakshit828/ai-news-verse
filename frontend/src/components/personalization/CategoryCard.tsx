@@ -104,7 +104,7 @@ export default function CategoryCard({
 
       <style>{`
         .category-card {
-          background: var(--gradient-card);
+          background: var(--color-bg-card);
           border: 1px solid var(--color-border-primary);
           border-radius: var(--radius-lg);
           box-shadow: var(--shadow-card);
@@ -112,28 +112,18 @@ export default function CategoryCard({
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          animation: cardEntrance 0.4s ease-out backwards;
-        }
-
-        @keyframes cardEntrance {
-          from {
-            opacity: 0;
-            transform: scale(0.98) translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
+          animation: slideUp 0.4s ease-out backwards;
+          position: relative;
         }
 
         .category-card:hover {
           box-shadow: var(--shadow-card-hover);
-          transform: translateY(-2px);
+          transform: translateY(-4px);
+          border-color: var(--color-accent-glow);
         }
 
         .category-card.custom {
           border-color: var(--color-custom);
-          border-width: 1.5px;
         }
 
         .category-card.custom::before {
@@ -142,37 +132,35 @@ export default function CategoryCard({
           top: 0;
           left: 0;
           right: 0;
-          height: 3px;
-          background: linear-gradient(90deg, var(--color-custom), var(--color-accent));
-          border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        }
-
-        .category-card.custom {
-          position: relative;
+          height: 4px;
+          background: var(--gradient-accent);
+          opacity: 0.8;
         }
 
         .category-card-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 18px 20px 14px;
+          padding: 24px 20px 16px;
           border-bottom: 1px solid var(--color-border-secondary);
+          background: var(--color-bg-secondary);
         }
 
         .category-card-title-group {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           min-width: 0;
         }
 
         .category-card-title {
-          font-size: 16px;
-          font-weight: 700;
+          font-size: 18px;
+          font-weight: 800;
           color: var(--color-text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          letter-spacing: -0.5px;
         }
 
         .category-custom-badge {
@@ -180,13 +168,13 @@ export default function CategoryCard({
           align-items: center;
           gap: 4px;
           font-size: 10px;
-          font-weight: 600;
-          padding: 3px 10px;
+          font-weight: 700;
+          padding: 4px 10px;
           border-radius: var(--radius-full);
-          background: var(--color-custom-light);
-          color: var(--color-custom);
-          white-space: nowrap;
-          flex-shrink: 0;
+          background: var(--color-bg-badge);
+          color: var(--color-accent);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .category-action-group {
@@ -196,9 +184,9 @@ export default function CategoryCard({
         }
 
         .category-delete-btn {
-          width: 26px;
-          height: 26px;
-          border-radius: var(--radius-sm);
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-md);
           border: none;
           background: transparent;
           color: var(--color-text-tertiary);
@@ -212,39 +200,63 @@ export default function CategoryCard({
         .category-delete-btn:hover {
           background: var(--color-error-light);
           color: var(--color-error);
+          transform: rotate(15deg);
         }
 
         .category-card-count {
           font-size: 12px;
-          font-weight: 600;
-          color: var(--color-text-tertiary);
+          font-weight: 700;
+          color: var(--color-text-secondary);
           background: var(--color-bg-tertiary);
-          padding: 4px 10px;
+          padding: 4px 12px;
           border-radius: var(--radius-full);
           white-space: nowrap;
           flex-shrink: 0;
         }
 
         .category-card-body {
-          padding: 8px 8px;
+          padding: 12px;
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 4px;
           flex: 1;
-          max-height: 320px;
+          max-height: 360px;
           overflow-y: auto;
+          scrollbar-width: thin;
         }
 
         .category-empty {
-          padding: 20px 12px;
+          padding: 32px 16px;
           text-align: center;
-          font-size: 13px;
+          font-size: 14px;
           color: var(--color-text-tertiary);
+          font-weight: 500;
         }
 
         .category-card-footer {
-          padding: 8px 12px 14px;
+          padding: 16px 20px 20px;
           border-top: 1px solid var(--color-border-secondary);
+          background: var(--color-bg-secondary);
+        }
+
+        @media (max-width: 768px) {
+          .category-card:hover {
+            transform: none;
+            box-shadow: var(--shadow-card);
+          }
+          .category-card-header {
+            padding: 18px 16px 12px;
+          }
+          .category-card-title {
+            font-size: 16px;
+          }
+          .category-card-body {
+            padding: 10px;
+            max-height: 280px;
+          }
+          .category-card-footer {
+            padding: 12px 16px 16px;
+          }
         }
       `}</style>
     </div>

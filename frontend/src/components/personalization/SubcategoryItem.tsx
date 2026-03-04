@@ -65,51 +65,38 @@ export default function SubcategoryItem({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 8px 12px;
+          padding: 10px 14px;
           border-radius: var(--radius-md);
           transition: all var(--transition-fast);
+          border: 1px solid transparent;
         }
 
         .subcategory-item:hover {
           background: var(--color-bg-hover);
-        }
-
-        .subcategory-item {
-          animation: slideInSub 0.3s ease-out;
-        }
-
-        @keyframes slideInSub {
-          from {
-            opacity: 0;
-            transform: translateX(-5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+          transform: translateX(4px);
+          border-color: var(--color-border-secondary);
         }
 
         .subcategory-item.checked {
           background: var(--color-accent-light);
-          transform: scale(1.02);
-          box-shadow: 0 2px 8px rgba(var(--color-accent-rgb), 0.1);
+          border-color: var(--color-accent-glow);
         }
 
         .subcategory-label {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           cursor: pointer;
           flex: 1;
           min-width: 0;
-          font-size: 13.5px;
+          font-size: 14px;
           color: var(--color-text-primary);
           user-select: none;
+          font-weight: 500;
         }
 
         .subcategory-label.no-checkbox {
           cursor: default;
-          padding-left: 4px;
         }
 
         .subcategory-checkbox {
@@ -121,9 +108,9 @@ export default function SubcategoryItem({
         }
 
         .subcategory-check-custom {
-          width: 20px;
-          height: 20px;
-          border-radius: var(--radius-sm);
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
           border: 2px solid var(--color-border-primary);
           display: flex;
           align-items: center;
@@ -134,29 +121,35 @@ export default function SubcategoryItem({
         }
 
         .check-icon {
-          width: 12px;
-          height: 10px;
+          width: 14px;
+          height: 12px;
           color: white;
           opacity: 0;
-          transform: scale(0.5);
+          transform: scale(0.5) rotate(-15deg);
           transition: all var(--transition-fast);
         }
 
         .subcategory-checkbox:checked + .subcategory-check-custom {
           background: var(--color-accent);
           border-color: var(--color-accent);
-          box-shadow: 0 2px 6px var(--color-accent-glow);
+          box-shadow: 0 4px 12px var(--color-accent-glow);
         }
 
         .subcategory-checkbox:checked + .subcategory-check-custom .check-icon {
           opacity: 1;
-          transform: scale(1);
+          transform: scale(1) rotate(0);
         }
 
         .subcategory-text {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          transition: color var(--transition-fast);
+        }
+
+        .subcategory-item.checked .subcategory-text {
+          color: var(--color-accent);
+          font-weight: 700;
         }
 
         .custom-badge {
@@ -164,18 +157,17 @@ export default function SubcategoryItem({
           align-items: center;
           gap: 4px;
           font-size: 10px;
-          font-weight: 600;
+          font-weight: 700;
           padding: 2px 8px;
           border-radius: var(--radius-full);
-          background: var(--color-custom-light);
-          color: var(--color-custom);
-          white-space: nowrap;
-          flex-shrink: 0;
+          background: var(--color-bg-badge);
+          color: var(--color-accent);
+          text-transform: uppercase;
         }
 
         .subcategory-delete {
-          width: 28px;
-          height: 28px;
+          width: 30px;
+          height: 30px;
           border-radius: var(--radius-sm);
           border: none;
           background: transparent;
@@ -186,12 +178,12 @@ export default function SubcategoryItem({
           justify-content: center;
           transition: all var(--transition-fast);
           flex-shrink: 0;
-          margin-left: 4px;
         }
 
         .subcategory-delete:hover {
           background: var(--color-error-light);
           color: var(--color-error);
+          transform: scale(1.1);
         }
       `}</style>
     </div>

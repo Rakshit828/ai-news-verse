@@ -6,17 +6,16 @@ from app.db.schemas.ai_news_service import Articles
 from app.db.main import AsyncSession
 from app.db.dependencies import get_session
 from app.services.ai_news_service import NewsDBService
-from app.news_service.types import ServiceArticle
-from app.news_service.types import MarkdownContent
-from app.news_service.sources import (
+from app.core.news_service.types import ServiceArticle
+from app.core.ai.models import ClassificationResponse
+from app.core.news_service.sources import (
     OpenAiService,
     AnthropicService,
     GoogleService,
     HackernoonService,
 )
-from app.ai.pipeline.news_title_classification import (
+from app.core.ai.pipeline import (
     VDBCategoryClassifier,
-    ClassificationResponse,
 )
 from app.services.notification_system import PubSubSystem
 from app.models.ai_news_service import NewNewsNotification
@@ -306,7 +305,7 @@ if __name__ == "__main__":
 
         total_articles: int = await repository.fetch_classify_and_save_articles(
             source="ANTHROPIC",
-            cutoff_hours=100000,
+            cutoff_hours=24,
             commit_on_each=True,
             scrape_content=False,
             classify=True,

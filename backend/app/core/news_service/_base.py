@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from app.ai.models import ClassificationResponse
+from app.core.ai.models import ClassificationResponse
 from typing import Dict
-from app.news_service.types import ServiceArticle
+from app.core.news_service.types import ServiceArticle
 from datetime import datetime, timezone
 
 

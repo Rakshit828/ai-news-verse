@@ -568,7 +568,7 @@ class CategoriesDBService(BaseDBInteractions):
                 # Pinecone record deletion is remaining
                 await session.execute(stmt_delete_category)
 
-        return self.get_user_categories(user_id=user_id, session=session)
+        return (await self.get_user_categories(user_id=user_id, session=session))
 
 
     async def create_custom_subcategory(
@@ -696,7 +696,7 @@ class CategoriesDBService(BaseDBInteractions):
                     UserSubCategory(user_id=user_id, subcategory_id=generated_subcat_id)
                 )
         # Return updated user categories
-        return await self.get_user_categories(user_id=user_id, session=session)
+        return (await self.get_user_categories(user_id=user_id, session=session))
 
     async def delete_custom_subcategory(
         self, user_id: str, subcategory_id: str, session: AsyncSession
@@ -719,6 +719,7 @@ class CategoriesDBService(BaseDBInteractions):
                 .all()
             )
             associated_users_str: list[str] = list(map(str, associated_users))
+
             if user_id not in associated_users_str:
                 raise AppError(
                     SubCategoryDeletionFailedError(

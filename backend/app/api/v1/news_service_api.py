@@ -286,7 +286,7 @@ async def delete_custom_category(
     "/remove/subcategory/{subcategory_id}",
     response_model=SuccessResponse[CategoryDataResponse],
 )
-async def delete_custom_category(
+async def delete_custom_subcategory(
     subcategory_id: str,
     decoded_token=Depends(AccessTokenBearer()),
     session: AsyncSession = Depends(get_session),
@@ -300,7 +300,7 @@ async def delete_custom_category(
     )
     return SuccessResponse[CategoryDataResponse](
         status_code=status.HTTP_200_OK,
-        message="Category deleted successfully.",
+        message="Subcategory deleted successfully.",
         data=CategoryDataResponse(categories_data=result.categories_data),
     )
 

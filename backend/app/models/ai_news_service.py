@@ -116,8 +116,8 @@ class BaseArticleResponse(BaseModel):
     title: str
     url: str
     description: str
-    category_id: str | None
-    subcategory_id: str | None
+    category_id: UUID | None
+    subcategory_id: UUID | None
 
     model_config = ConfigDict(extra="ignore")
 
