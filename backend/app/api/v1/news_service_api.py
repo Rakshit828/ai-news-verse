@@ -28,7 +28,7 @@ from app.models.ai_news_service import (
 )
 from app.services.ai_news_service import NewsDBService, CategoriesDBService
 from app.services.notification_system import PubSubSystem
-from app.ai.components.pinecone_db import PineconeClient
+from app.core.ai.components.pinecone_db import PineconeClient
 from app.services.utils import safely_run_controllers
 from app.db.dependencies import get_session
 from app.response import SuccessResponse
@@ -73,7 +73,7 @@ async def websocket_endpoint(
         for task in tasks:
             task.cancel()
     except Exception as e:
-            logger.error(str(e))
+        logger.error(str(e))
 
 
 @news_routes.get(
@@ -255,6 +255,52 @@ async def create_custom_subcategory(
     return SuccessResponse[CategoryDataResponse](
         status_code=status.HTTP_201_CREATED,
         message="Subcategories Added Successfully",
+        data=CategoryDataResponse(categories_data=result.categories_data),
+    )
+
+
+@news_routes.delete(
+    "/remove/category/{category_id}",
+    response_model=SuccessResponse[CategoryDataResponse],
+)
+async def delete_custom_category(
+    category_id: str,
+    decoded_token=Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = decoded_token["sub"]
+    result: ResponseCategoryDataModel = await safely_run_controllers(
+        category_service.delete_custom_category,
+        user_id=user_id,
+        category_id=category_id,
+        session=session,
+    )
+    return SuccessResponse[CategoryDataResponse](
+        status_code=status.HTTP_200_OK,
+        message="Category deleted successfully.",
+        data=CategoryDataResponse(categories_data=result.categories_data),
+    )
+
+
+@news_routes.delete(
+    "/remove/subcategory/{subcategory_id}",
+    response_model=SuccessResponse[CategoryDataResponse],
+)
+async def delete_custom_category(
+    subcategory_id: str,
+    decoded_token=Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_session),
+):
+    user_id = decoded_token["sub"]
+    result: ResponseCategoryDataModel = await safely_run_controllers(
+        category_service.delete_custom_subcategory,
+        user_id=user_id,
+        subcategory_id=subcategory_id,
+        session=session,
+    )
+    return SuccessResponse[CategoryDataResponse](
+        status_code=status.HTTP_200_OK,
+        message="Category deleted successfully.",
         data=CategoryDataResponse(categories_data=result.categories_data),
     )
 

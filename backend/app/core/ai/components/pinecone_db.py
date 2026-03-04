@@ -1,4 +1,4 @@
-from app.ai.models import (
+from app.core.ai.models import (
     PrimaryCategoryRecord,
     TopicKeywordRecord,
     PrimaryCategoryRecordResponse,

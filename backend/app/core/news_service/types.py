@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import List, TypeAlias, Literal
-from app.ai.models import ClassificationResponse
+from app.core.ai.models import ClassificationResponse
 
 MarkdownContent: TypeAlias = str
 

@@ -32,6 +32,17 @@ class SubCategoryAlreadyExistsError(ErrorResponse[T]):
     error: str = "subcategory_already_exists_error"
     data: T | None = None
 
+class CategoryDeletionFailedError(ErrorResponse[T]):
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    message: str = "Category Deletion failed."
+    error: str = "category_deletion_failed_error"
+    data: T | None = None
+
+class SubCategoryDeletionFailedError(ErrorResponse[T]):
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    message: str = "SubCategory deletion failed."
+    error: str = "subcategory_deletion_failed_error"
+    data: T | None = None
 
 class NotMeaningfulTopicError(ErrorResponse[T]):
     status_code: int = status.HTTP_400_BAD_REQUEST

@@ -2,7 +2,7 @@ import json
 import uuid
 import asyncio
 from uuid import UUID
-from sqlalchemy import select, delete, insert
+from sqlalchemy import select, delete, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
 from typing import Sequence, List, Literal, Tuple
@@ -43,26 +43,27 @@ from app.exceptions import (
     CategoryNotFoundError,
     SubCategoryNotFoundError,
     NotMeaningfulTopicError,
+    CategoryDeletionFailedError,
+    SubCategoryDeletionFailedError,
 )
-from app.news_service.types import ServiceArticle
-from app.ai.models import (
+from app.core.news_service.types import ServiceArticle
+from app.core.ai.models import (
     ClassificationResponse,
     CategoryCheckResponse,
     SubcategoryCheckResponse,
     TopicKeywordRecordResponse,
 )
-from app.ai.components.pinecone_db import (
+from app.core.ai.components.pinecone_db import (
     PineconeClient,
     TopicKeywordRecord,
     PrimaryCategoryRecord,
 )
-from app.ai.components.topic_description_generator import (
+from app.core.ai.components.topic_description_generator import (
     TopicDescriptionGenerator,
     TopicDescription,
     CanonicalName,
 )
 from app.constants import (
-    PINECONE_APPLICATION_CATEGORY_NAMESPACE,
     PINECONE_CANONICAL_TOPIC_NAMESPACE,
     PINECONE_USER_CATEGORY_NAMESPACE,
 )
@@ -507,6 +508,69 @@ class CategoriesDBService(BaseDBInteractions):
 
         return category_data_response
 
+    async def delete_custom_category(
+        self, user_id: str, category_id: str, session: AsyncSession
+    ):
+        perform_delete = True
+        async with session.begin():
+            stmt_delete_category = delete(Category).where(
+                Category.category_id == category_id
+            )
+            stmt_delete_user_category = delete(UserCategory).where(
+                UserCategory.user_id == user_id, UserCategory.category_id == category_id
+            )
+            stmt_check_category_subcategories = (
+                select(
+                    Category.category_id,
+                    func.coalesce(
+                        func.array_agg(SubCategory.subcategory_id).filter(
+                            SubCategory.subcategory_id != None
+                        ),
+                        [],
+                    ).label("subcategory_ids"),
+                )
+                .outerjoin(
+                    SubCategory,
+                    (SubCategory.category_id == Category.category_id)
+                    & (SubCategory.added_by_users == True),
+                )
+                .where(
+                    Category.category_id == category_id, Category.added_by_users == True
+                )
+                .group_by(Category.category_id)
+            )
+            result = (await session.execute(stmt_check_category_subcategories)).first()
+
+            if not result:
+                raise AppError(CategoryNotFoundError())
+
+            elif result.subcategory_ids != []:
+                stmt_check_user_with_subcategories = select(
+                    UserSubCategory.user_id
+                ).where(
+                    UserSubCategory.subcategory_id.in_(result.subcategory_ids),
+                    UserSubCategory.user_id == user_id,
+                )
+                result: UUID | None = (
+                    await session.execute(stmt_check_user_with_subcategories)
+                ).first()
+
+                if result is None:
+                    raise AppError(
+                        CategoryDeletionFailedError(
+                            message="Cannot delete category having subcategories."
+                        )
+                    )
+                await session.execute(stmt_delete_user_category)
+            else:
+                # This is the case when subcategory doesn't exist.
+                # This will delete the row in UserCategory too.
+                # Pinecone record deletion is remaining
+                await session.execute(stmt_delete_category)
+
+        return self.get_user_categories(user_id=user_id, session=session)
+
+
     async def create_custom_subcategory(
         self,
         user_id: str,
@@ -523,7 +587,9 @@ class CategoriesDBService(BaseDBInteractions):
                 UserCategory.user_id == user_id,
                 UserCategory.category_id == category_id,
             )
-            linked_category_id = (await session.execute(check_stmt)).scalar_one_or_none()
+            linked_category_id = (
+                await session.execute(check_stmt)
+            ).scalar_one_or_none()
             if not linked_category_id:
                 raise AppError(
                     CategoryNotFoundError(
@@ -627,12 +693,47 @@ class CategoriesDBService(BaseDBInteractions):
 
                 session.add(new_subcategory)
                 session.add(
-                    UserSubCategory(
-                        user_id=user_id, subcategory_id=generated_subcat_id
-                    )
+                    UserSubCategory(user_id=user_id, subcategory_id=generated_subcat_id)
                 )
         # Return updated user categories
         return await self.get_user_categories(user_id=user_id, session=session)
+
+    async def delete_custom_subcategory(
+        self, user_id: str, subcategory_id: str, session: AsyncSession
+    ):
+        stmt_delete_subcategory = delete(SubCategory).where(
+            SubCategory.subcategory_id == subcategory_id
+        )
+        stmt_delete_user_subcategory = delete(UserSubCategory).where(
+            UserSubCategory.user_id == user_id,
+            UserSubCategory.subcategory_id == subcategory_id,
+        )
+        stmt_get_associated_users_with_subcategory = select(
+            UserSubCategory.user_id
+        ).where(UserSubCategory.subcategory_id == subcategory_id)
+
+        async with session.begin():
+            associated_users: list[UUID] = (
+                (await session.execute(stmt_get_associated_users_with_subcategory))
+                .scalars()
+                .all()
+            )
+            associated_users_str: list[str] = list(map(str, associated_users))
+            if user_id not in associated_users_str:
+                raise AppError(
+                    SubCategoryDeletionFailedError(
+                        message="Cannot delete unselected subcategory."
+                    )
+                )
+            elif len(associated_users_str) == 1:
+                # This condition means the existing user_id is the current user.
+                # Pinecone record deletion is remaining
+                await session.execute(stmt_delete_subcategory)
+            elif len(associated_users_str) > 1:
+                await session.execute(stmt_delete_user_subcategory)
+        
+        return (await self.get_user_categories(user_id=user_id, session=session))
+
 
     async def get_user_subcategories_id(
         self, user_id: str, session: AsyncSession
@@ -816,7 +917,7 @@ class NewsDBService:
             session.add(article_orm)
             if len(user_defined_classification) != 0:
                 session.add_all(user_defined_classification)
-                
+
         return article_orm
 
     async def bulk_create_articles(

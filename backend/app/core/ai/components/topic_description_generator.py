@@ -2,7 +2,7 @@ import json
 from loguru import logger
 import uuid
 from pydantic import BaseModel
-from app.ai.components.llms import UseLLMsGroq, GroqModelEnum
+from app.core.ai.components.llms import UseLLMsGroq, GroqModelEnum
 
 
 class TopicDescription(BaseModel):

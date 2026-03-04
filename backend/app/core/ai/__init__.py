@@ -1,4 +1,4 @@
-from app.ai.models import PrimaryCategoryRecord, TopicKeywordRecord, PrimaryCategoryRecordResponse, TopicKeywordRecordResponse
+from app.core.ai.models import PrimaryCategoryRecord, TopicKeywordRecord, PrimaryCategoryRecordResponse, TopicKeywordRecordResponse
 
 __all__ = [
     "PrimaryCategoryRecord",

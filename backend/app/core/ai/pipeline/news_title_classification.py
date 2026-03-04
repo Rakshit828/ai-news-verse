@@ -1,7 +1,7 @@
 """This file defines the logic to classify the category and subcategory from the title."""
 
-from app.ai.components.pinecone_db import PineconeClient, init_pinecone_db
-from app.ai.models import (
+from app.core.ai.components.pinecone_db import PineconeClient, init_pinecone_db
+from app.core.ai.models import (
     PrimaryCategoryRecordResponse,
     ClassificationResponse,
 )

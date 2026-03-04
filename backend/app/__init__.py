@@ -7,7 +7,7 @@ from app.api.v1.auth_api import auth_routes
 from app.api.v1.news_service_api import news_routes
 from loguru import logger
 from app.db.redis import init_redis
-from app.ai.components.pinecone_db import init_pinecone_db, PineconeClient
+from app.core.ai.components.pinecone_db import init_pinecone_db, PineconeClient
 
 VERSION = "v1"
 origins = [
