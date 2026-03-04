@@ -8,6 +8,7 @@ import type { LoginPayload, SignupPayload } from '@/types/auth.types'
 import type { AxiosError } from 'axios'
 import type { ApiError } from '@/types/api.types'
 
+
 export const useLoginMutation = () => {
   const { setUser } = useAuthStore()
   const navigate = useNavigate()
@@ -35,6 +36,9 @@ export const useSignupMutation = () => {
       toast.success(res.message)
       navigate('/login')
     },
+
+    // error; it will be whatever authService.signup throws, since we do not handle .catch their
+    // it will be whatever axiosInstance throws i.e. AxiosError<ApiError>
     onError: (error: AxiosError<ApiError>) => {
       const message = error.response?.data?.message ?? 'Signup failed. Please try again.'
       toast.error(message)

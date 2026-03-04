@@ -1,4 +1,3 @@
-// src/types/auth.types.ts
 
 export interface User {
   first_name: string
