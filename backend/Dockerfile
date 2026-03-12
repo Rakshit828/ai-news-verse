@@ -3,8 +3,6 @@
 
 FROM ai-news-backend-base:latest  
 
-ENV PATH="/uvx/bin:$PATH"
-
 WORKDIR /contenerization
 
 # Copy app code

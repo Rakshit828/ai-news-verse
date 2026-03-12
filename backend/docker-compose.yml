@@ -1,5 +1,19 @@
+version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_news
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -7,6 +21,26 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    restart: unless-stopped
+
+  api:
+    image: ai-news-backend:latest
+    container_name: api
+    working_dir: /contenerization
+    command: bash -c "alembic upgrade head && fastapi run app"
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/ai_news
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
 
   celery_worker:
     image: ai-news-backend:latest
@@ -16,12 +50,12 @@ services:
     env_file:
       - ./.env
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./:/contenerization:rw
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/ai_news
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      PYTHONUNBUFFERED: "1"
     depends_on:
+      - postgres
       - redis
     restart: unless-stopped
 
@@ -33,15 +67,15 @@ services:
     env_file:
       - ./.env
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./:/contenerization:rw
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/ai_news
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      PYTHONUNBUFFERED: "1"
     depends_on:
+      - postgres
       - redis
     restart: unless-stopped
 
 volumes:
+  postgres-data:
   redis-data:
-    name: redis-data
