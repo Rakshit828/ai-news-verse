@@ -1,13 +1,12 @@
 import asyncio
 import feedparser
 from typing import List, Literal, Optional, Dict, Any
-from playwright.async_api import async_playwright
 from datetime import datetime, timedelta, timezone
-from docling.datamodel.base_models import InputFormat
-from docling.document_converter import DocumentConverter
+# from docling.datamodel.base_models import InputFormat
+# from docling.document_converter import DocumentConverter
 from loguru import logger
 
-from app.core.news_service.components._playwright_scraper import run_playwright
+# from app.core.news_service.components._playwright_scraper import run_playwright
 
 
 class RSSFeedNotAvailable(Exception):
@@ -21,19 +20,20 @@ class CannotGetContent(Exception):
 
 
 class Scraper:
-    converter = DocumentConverter()
+    # converter = DocumentConverter()
 
     def __init__(self, rss_urls: list[str], requires_playwright: bool):
         self.rss_urls = rss_urls
         self.requires_playwright = requires_playwright
 
     async def _scrape_html_using_playwright(self, url: str):
-        if self.requires_playwright is False:
-            raise DoNotRequiresPlaywright()
-        async with async_playwright() as playwright:
-            data = await run_playwright(playwright, url)
-            html = data["html"]
-            return html
+        return None
+        # if self.requires_playwright is False:
+        #     raise DoNotRequiresPlaywright()
+        # async with async_playwright() as playwright:
+        #     data = await run_playwright(playwright, url)
+        #     html = data["html"]
+        #     return html
 
     async def get_entries_from_rss_feed(self, cutoff_hours: int = 24) -> List[Dict]:
         """Returns the list of the entries from rss feed"""
@@ -64,29 +64,31 @@ class Scraper:
         self, url: str, content_format: Literal["markdown", "text"] = "markdown"
     ) -> Optional[str]:
         """Handles the scraping of the given url and its parsing too into various formats like markdown, text etc."""
-        try:
+        return None
+        # Removed docling and plawright since we are not using it.
+        # try:
 
-            if self.requires_playwright is True:
-                html = await self._scrape_html_using_playwright(url=url)
+        #     if self.requires_playwright is True:
+        #         html = await self._scrape_html_using_playwright(url=url)
 
-                result = self.converter.convert_string(
-                    content=html, format=InputFormat.HTML, name="openai.html"
-                )
-                docling_doc = result.document
-            else:
-                result = self.converter.convert(source=url)
-                docling_doc = result.document
+        #         result = self.converter.convert_string(
+        #             content=html, format=InputFormat.HTML, name="openai.html"
+        #         )
+        #         docling_doc = result.document
+        #     else:
+        #         result = self.converter.convert(source=url)
+        #         docling_doc = result.document
 
-            match content_format:
-                case "markdown":
-                    markdown_content = docling_doc.export_to_markdown()
-                    return markdown_content
-                case "text":
-                    text_content = docling_doc.export_to_text()
-                    return text_content
+        #     match content_format:
+        #         case "markdown":
+        #             markdown_content = docling_doc.export_to_markdown()
+        #             return markdown_content
+        #         case "text":
+        #             text_content = docling_doc.export_to_text()
+        #             return text_content
 
-        except Exception:
-            raise CannotGetContent("Error during getting of the content")
+        # except Exception:
+        #     raise CannotGetContent("Error during getting of the content")
 
 
 if __name__ == '__main__':

@@ -1,13 +1,11 @@
-FROM python:3.12-slim-trixie
+# Dockerfile
+# Using the base image built from Dockerfile.base
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.3 /uv /uvx /bin/
+FROM ai-news-backend-base:latest  
+
+ENV PATH="/uvx/bin:$PATH"
 
 WORKDIR /contenerization
 
-COPY uv.lock pyproject.toml ./
-RUN uv sync --locked
-
+# Copy app code
 COPY . .
-
-
-CMD ["uv", "run", "fastapi", "dev", "app"]
