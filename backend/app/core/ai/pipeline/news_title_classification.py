@@ -1,6 +1,7 @@
 """This file defines the logic to classify the category and subcategory from the title."""
 
-from app.core.ai.components import PineconeClient, init_pinecone_db
+from app.core.ai.components import PineconeService, init_pinecone_db
+
 from app.core.ai.models import (
     PrimaryCategoryRecordResponse,
     ClassificationResponse,
@@ -13,12 +14,15 @@ from app.constants import (
 
 class VDBCategoryClassifier:
 
-    def __init__(self, pinecone: PineconeClient = None):
-        self.pinecone = pinecone
+    def __init__(self, pinecone: PineconeService = None):
+        self._pinecone = pinecone
 
     @classmethod
     async def create(cls):
         return cls(pinecone=await init_pinecone_db())
+    
+    async def close_pc_connection(self) -> None:
+        await self._pinecone.close()
 
 
     async def run(self, title: str) -> ClassificationResponse:
@@ -28,12 +32,12 @@ class VDBCategoryClassifier:
         }
 
         app_records: list[PrimaryCategoryRecordResponse] = (
-            await self.pinecone.get_relevant_title_records(
+            await self._pinecone.get_relevant_title_records(
                 namespace=PINECONE_APPLICATION_CATEGORY_NAMESPACE, title=title, k=1
             )
         )
         user_records: list[PrimaryCategoryRecordResponse] = (
-            await self.pinecone.get_relevant_title_records(
+            await self._pinecone.get_relevant_title_records(
                 namespace=PINECONE_USER_CATEGORY_NAMESPACE, title=title, k=4
             )
         )

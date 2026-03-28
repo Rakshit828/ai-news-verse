@@ -11,7 +11,7 @@ from fastapi import (
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from typing import Union
 
-from app.auth.dependencies import AccessTokenBearer
+from app.auth.dependencies import AccessTokenBearer, AccessTokenBearerForWS
 from app.models.ai_news_service import (
     SetUsersCategoriesModel,
     SimilarCategoryExistsResponse,
@@ -28,7 +28,7 @@ from app.models.ai_news_service import (
 )
 from app.services.ai_news_service import NewsDBService, CategoriesDBService
 from app.services.notification_system import PubSubSystem
-from app.core.ai.components.pinecone_db import PineconeClient
+from app.core.ai.components.pinecone_db import PineconeService
 from app.services.utils import safely_run_controllers
 from app.db.dependencies import get_session
 from app.response import SuccessResponse
@@ -42,10 +42,13 @@ news_service = NewsDBService()
 redis_pubsub = PubSubSystem()
 
 
-@news_routes.websocket("/ws/{user_id}")
+@news_routes.websocket("/ws/livenews")
 async def websocket_endpoint(
-    websocket: WebSocket, user_id: str, session: AsyncSession = Depends(get_session)
+    websocket: WebSocket,
+    token_data=Depends(AccessTokenBearerForWS()),
+    session: AsyncSession = Depends(get_session),
 ):
+    user_id = token_data["sub"]
     logger.debug(f"Client {user_id} is trying to connect.")
     # Accepting a connection
     await websocket.accept()
@@ -176,7 +179,7 @@ async def create_own_category(
     SuccessResponse[SimilarCategoryExistsResponse],
 ]:
     user_id = decoded_token["sub"]
-    pinecone_client: PineconeClient = req.app.state.pinecone_client
+    pinecone_client: PineconeService = req.app.state.pinecone_client
     result: (
         ResponseCategoryDataModel
         | CategoryAlreadyExistsResponse
@@ -228,7 +231,7 @@ async def create_custom_subcategory(
     SuccessResponse[SubcategoryAlreadyExistsResponse],
 ]:
     user_id = decoded_token["sub"]
-    pinecone_client: PineconeClient = req.app.state.pinecone_client
+    pinecone_client: PineconeService = req.app.state.pinecone_client
     result: (
         ResponseCategoryDataModel
         | SubcategoryAlreadyExistsResponse

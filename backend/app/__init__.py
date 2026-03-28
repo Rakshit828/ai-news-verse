@@ -6,8 +6,12 @@ from app.response import AppError
 from app.api.v1.auth_api import auth_routes
 from app.api.v1.news_service_api import news_routes
 from loguru import logger
-from app.db.redis import init_redis
-from app.core.ai.components.pinecone_db import init_pinecone_db, PineconeClient
+from app.core.ai.components import PineconeService, init_pinecone_db
+from app.core.ai.pipeline._initialize_pinecone import run_init_pinecone_pipeline
+from app.services.ai_news_service import CategoriesDBService
+from app.db.dependencies import get_session
+from loguru import logger
+
 
 VERSION = "v1"
 origins = [
@@ -20,8 +24,14 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    pinecone_client: PineconeClient = await init_pinecone_db()
-    await init_redis()
+    async for session in get_session():
+        logger.debug("Starting to Initialize categories.")
+        await CategoriesDBService._initialize_categories(session=session)
+    pinecone_client: PineconeService = await init_pinecone_db()
+
+    data_exists = await pinecone_client.does_namespaces_exist()
+    if not data_exists:
+        await run_init_pinecone_pipeline(pinecone_client=pinecone_client)
     app.state.pinecone_client = pinecone_client
     yield
 

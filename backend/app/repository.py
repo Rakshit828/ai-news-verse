@@ -25,7 +25,7 @@ class InvalidArgument(Exception):
     pass
 
 
-def deduplicate(entries: dict):
+def deduplicate(entries: list[dict]) -> list[dict]:
     seen = set()
     unique_entries = []
     for entry in entries:
@@ -38,7 +38,7 @@ def deduplicate(entries: dict):
     return entries
 
 
-def check_for_unique_titles(entries):
+def check_for_unique_titles(entries) -> list[dict]:
     # splitting by '-' separte title from source.
     seen = set()
     unique_entries = []
@@ -54,6 +54,45 @@ def check_for_unique_titles(entries):
 
     entries = unique_entries
     return entries
+
+
+def prepare_messages_for_publishing(
+    articles: List[ServiceArticle],
+) -> List[NewNewsNotification]:
+    news: List[NewNewsNotification] = list()
+    for article in articles:
+        classification = article.classification
+        if len(classification["user_defined"]) == 0:
+            classification["user_defined"] = []
+
+        news.extend(
+            [
+                NewNewsNotification(
+                    guid=article.guid,
+                    title=article.title,
+                    link=article.url,
+                    description=article.description,
+                    summary=article.summary,
+                    source=article.source,
+                    category_id=user_defined_cat["category_id"],
+                    subcategory_id=user_defined_cat["subcategory_id"],
+                )
+                for user_defined_cat in classification["user_defined"]
+            ]
+        )
+        news.append(
+            NewNewsNotification(
+                guid=article.guid,
+                title=article.title,
+                link=article.url,
+                description=article.description,
+                summary=article.summary,
+                source=article.source,
+                category_id=classification["app_defined"]["category_id"],
+                subcategory_id=classification["app_defined"]["subcategory_id"],
+            )
+        )
+    return news
 
 
 class NewsRepository:
@@ -125,48 +164,65 @@ class NewsRepository:
 
         return service_article
 
-    async def prepare_messages_for_publishing(
-        self, articles: List[ServiceArticle]
-    ) -> List[NewNewsNotification]:
-        news: List[NewNewsNotification] = list()
-        for article in articles:
-            classification = article.classification
-            if len(classification["user_defined"]) == 0:
-                classification["user_defined"] = []
-
-            news.extend(
-                [
-                    NewNewsNotification(
-                        guid=article.guid,
-                        title=article.title,
-                        link=article.url,
-                        description=article.description,
-                        summary=article.summary,
-                        source=article.source,
-                        category_id=user_defined_cat["category_id"],
-                        subcategory_id=user_defined_cat["subcategory_id"],
+    async def _commit_on_each_entries_preprocessor(
+        self,
+        entries: list[dict],
+        pubsub: PubSubSystem,
+        scrape_content: bool = False,
+        classify: bool = True,
+    ) -> int:
+        no_of_articles = 0
+        for entry in entries:
+            service_article: ServiceArticle = await self.process_entry(
+                entry=entry, scrape_content=scrape_content, classify=classify
+            )
+            if service_article is not None:
+                async for session in get_session():
+                    article: Articles = await self.db.create_article(
+                        article=service_article, session=session
                     )
-                    for user_defined_cat in classification["user_defined"]
-                ]
+                    logger.info(f"Article saved: {article.title}, GUID: {article.guid}")
+
+                    # Publishing to redis.
+                    news_messages: List[NewNewsNotification] = (
+                        prepare_messages_for_publishing(articles=[service_article])
+                    )
+                    await pubsub.publish(news_messages)
+
+            no_of_articles = no_of_articles + 1
+        return no_of_articles
+
+    async def _bulk_commit_entries_preproocessor(
+        self,
+        entries: list[dict],
+        pubsub: PubSubSystem,
+        scrape_content: bool = False,
+        classify: bool = True,
+    ) -> int:
+        classified_articles: List[ServiceArticle] = []
+        for entry in entries:
+            service_article: ServiceArticle = await self.process_entry(
+                entry=entry, scrape_content=scrape_content, classify=classify
             )
-            news.append(
-                NewNewsNotification(
-                    guid=article.guid,
-                    title=article.title,
-                    link=article.url,
-                    description=article.description,
-                    summary=article.summary,
-                    source=article.source,
-                    category_id=classification["app_defined"]["category_id"],
-                    subcategory_id=classification["app_defined"]["subcategory_id"],
-                )
-            )
-        return news
+            logger.info(f"Article processed: {service_article.title}")
+
+            if service_article is not None:
+                classified_articles.append(service_article)
+
+        if classified_articles:
+            async for session in get_session():
+                await self.db.bulk_create_articles(classified_articles, session)
+
+        news_messages: list[NewNewsNotification] = (
+            await self.prepare_messages_for_publishing(articles=classified_articles)
+        )
+        await pubsub.publish(news_messages)
+        return len(classified_articles)
 
     async def fetch_classify_and_save_articles(
         self,
         source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"],
-        pubsub: PubSubSystem = PubSubSystem(),
+        pubsub: PubSubSystem | None = None,
         cutoff_hours: int = 24,
         commit_on_each: bool = False,
         scrape_content: bool = True,
@@ -175,8 +231,13 @@ class NewsRepository:
         """Main workflow: fetch, classify, and save articles"""
         self.current_service = self._get_current_service(source=source)
         
-        entries = await self.current_service.scraper.get_entries_from_rss_feed(
-            cutoff_hours=cutoff_hours
+        if pubsub is None:
+            pubsub = PubSubSystem()
+
+        entries: list[dict] = (
+            await self.current_service.scraper.get_entries_from_rss_feed(
+                cutoff_hours=cutoff_hours
+            )
         )
 
         if not entries:
@@ -184,12 +245,12 @@ class NewsRepository:
             return 0
 
         # ---- ADD DEDUPLICATION HERE ----
-        unique_entries = deduplicate(entries)
+        unique_entries: list[dict] = deduplicate(entries)
         if source == "GOOGLE":
-            unique_entries = check_for_unique_titles(unique_entries)
+            unique_entries: list[dict] = check_for_unique_titles(unique_entries)
         # --------------------------------
 
-        entries = unique_entries
+        entries: list[dict] = unique_entries
 
         all_guids = {entry["guid"] for entry in entries}
         logger.debug(f"Scraped GUIDs: {all_guids}")
@@ -211,53 +272,22 @@ class NewsRepository:
         logger.info(f"Total entries to be fetched: {len(entries)}")
 
         if commit_on_each is True:
-            no_of_articles = 0
-            for entry in entries:
-                service_article: ServiceArticle = await self.process_entry(
-                    entry=entry, scrape_content=scrape_content, classify=classify
-                )
-                if service_article is not None:
-                    async for session in get_session():
-                        article: Articles = await self.db.create_article(
-                            article=service_article, session=session
-                        )
-                        logger.info(
-                            f"Article saved: {article.title}, GUID: {article.guid}"
-                        )
-
-                        # Publishing to redis.
-                        news_messages: List[NewNewsNotification] = (
-                            await self.prepare_messages_for_publishing(
-                                articles=[service_article]
-                            )
-                        )
-                        await pubsub.publish(news_messages)
-
-                no_of_articles = no_of_articles + 1
-            return no_of_articles
+            no_of_articles: int = await self._commit_on_each_entries_preprocessor(
+                entries=entries,
+                pubsub=pubsub,
+                scrape_content=scrape_content,
+                classify=classify,
+            )
+            logger.info(f"{no_of_articles} new articles saved and notified.")
 
         else:
-
-            classified_articles: List[ServiceArticle] = []
-            for entry in entries:
-                service_article: ServiceArticle = await self.process_entry(
-                    entry=entry, scrape_content=scrape_content, classify=classify
-                )
-                logger.info(f"Article processed: {service_article.title}")
-
-                if service_article is not None:
-                    classified_articles.append(service_article)
-
-            if classified_articles:
-                async for session in get_session():
-                    await self.db.bulk_create_articles(classified_articles, session)
-
-            news_messages: list[NewNewsNotification] = (
-                await self.prepare_messages_for_publishing(articles=classified_articles)
+            no_of_articles: int = await self._bulk_commit_entries_preproocessor(
+                entries=entries,
+                pubsub=pubsub,
+                scrape_content=scrape_content,
+                classify=classify,
             )
-            await pubsub.publish(news_messages)
-
-            return len(classified_articles)
+            logger.info(f"{no_of_articles} new articles saved and notified.")
 
 
 async def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:

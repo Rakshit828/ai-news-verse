@@ -5,7 +5,8 @@ from loguru import logger
 import sqlalchemy.exc as exc
 import uuid
 
-from app.core.ai.components import init_pinecone_db, PineconeClient
+
+from app.core.ai.components import init_pinecone_db, PineconeService
 from app.core.ai.models import (
     PrimaryCategoryRecord,
     TopicKeywordRecord,
@@ -27,7 +28,7 @@ from app.models.ai_news_service import ResponseCategoryDataModel
 class PineconeInitializer:
     def __init__(
         self,
-        pinecone: PineconeClient,
+        pinecone: PineconeService,
         categories_data: ResponseCategoryDataModel,
         topic_description_generator: TopicDescriptionGenerator,
     ):
@@ -36,14 +37,6 @@ class PineconeInitializer:
         self.topic_description_generator = topic_description_generator
 
     async def main_pipeline(self):
-
-        logger.critical("Run only once, data might be duplicated in pinecone db.")
-
-        choice = input("Do you want to proceed?(y/n): ")
-
-        if choice.lower() != "y":
-            return
-
         pinecone_records: list[PrimaryCategoryRecord] = []
         canonical_topics_records: list[TopicKeywordRecord] = []
         subcategories: list[str] = [
@@ -101,29 +94,27 @@ class PineconeInitializer:
         )
 
 
-if __name__ == "__main__":
 
-    async def main():
-        category_service: CategoriesDBService = CategoriesDBService()
+async def run_init_pinecone_pipeline(pinecone_client: PineconeService):
+    category_service: CategoriesDBService = CategoriesDBService()
 
-        async for session in get_session():
-            try:
-                categories_data: ResponseCategoryDataModel = (
-                    await category_service.get_categories_data(session=session)
-                )
-            except Exception as e:
-                logger.error(f"Error Occurred : ", str(e))
+    async for session in get_session():
+        try:
+            categories_data: ResponseCategoryDataModel = (
+                await category_service.get_categories_data(session=session)
+            )
+        except Exception as e:
+            logger.error(f"Error Occurred : ", str(e))
 
-        pinecone: PineconeClient = await init_pinecone_db()
-        topic_description_generator: TopicDescriptionGenerator = (
-            TopicDescriptionGenerator()
-        )
+    topic_description_generator: TopicDescriptionGenerator = (
+        TopicDescriptionGenerator()
+    )
 
-        initializer: PineconeInitializer = PineconeInitializer(
-            pinecone=pinecone,
-            categories_data=categories_data,
-            topic_description_generator=topic_description_generator,
-        )
-        await initializer.main_pipeline()
+    initializer: PineconeInitializer = PineconeInitializer(
+        pinecone=pinecone_client,
+        categories_data=categories_data,
+        topic_description_generator=topic_description_generator,
+    )
+    await initializer.main_pipeline()
 
-    asyncio.run(main())
+

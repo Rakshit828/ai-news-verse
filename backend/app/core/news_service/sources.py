@@ -66,7 +66,7 @@ class GoogleService(BaseNewsService):
 
     @classmethod
     async def create(cls, rss_urls: list[str]):
-        """Factory method to create Anthropic service instance"""
+        """Factory method to create Google service instance"""
         scraper = Scraper(
             rss_urls=rss_urls,
             requires_playwright=True,

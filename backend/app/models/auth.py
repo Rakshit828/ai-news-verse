@@ -16,6 +16,7 @@ class UserLogInModel(BaseModel):
 
 
 class UserResponseModel(BaseModel):
+    uuid: UUID
     first_name: str
     last_name: str
     email: EmailStr

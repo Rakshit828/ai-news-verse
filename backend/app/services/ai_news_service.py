@@ -1,6 +1,4 @@
-import json
 import uuid
-import asyncio
 from uuid import UUID
 from sqlalchemy import select, delete, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +15,7 @@ from app.db.schemas import (
     Articles,
     UserDefinedArticleClassification,
 )
+from app.db.init_data import INITIAL_CATEGORIES_DATA
 from app.models.ai_news_service import (
     GoogleNewsResponse,
     AnthropicNewsResponse,
@@ -54,7 +53,7 @@ from app.core.ai.models import (
     TopicKeywordRecordResponse,
 )
 from app.core.ai.components.pinecone_db import (
-    PineconeClient,
+    PineconeService,
     TopicKeywordRecord,
     PrimaryCategoryRecord,
 )
@@ -125,47 +124,49 @@ class BaseDBInteractions:
 class CategoriesDBService(BaseDBInteractions):
     @staticmethod
     async def _initialize_categories(session: AsyncSession):
-        with open(
-            r"D:\GenAI\AiNewsSystem\backend\app\db\schemas\_category.json",
-            "r",
-            encoding="utf-8",
-        ) as f:
+        check_statement = select(Category.category_id)
+        result = (await session.execute(check_statement)).scalars().all()
+        if len(result) != 0:
+            logger.debug("Data already existed. No initilization required.")
+            return
 
-            categories_data = json.load(f)["categories"]
+        logger.debug("Initializing data.")
 
-            category_rows = []
-            subcategory_rows = []
+        categories_data = INITIAL_CATEGORIES_DATA["categories"]
 
-            for category in categories_data:
-                category_rows.append(
+        category_rows = []
+        subcategory_rows = []
+
+        for category in categories_data:
+            category_rows.append(
+                {
+                    "category_id": uuid.uuid4(),
+                    "title": category["title"],
+                }
+            )
+
+            for sub in category["subcategories"]:
+                subcategory_rows.append(
                     {
-                        "category_id": uuid.uuid4(),
-                        "title": category["title"],
+                        "subcategory_id": uuid.uuid4(),
+                        "title": sub["title"],
+                        "category_id": category_rows[-1]["category_id"],
                     }
                 )
 
-                for sub in category["subcategories"]:
-                    subcategory_rows.append(
-                        {
-                            "subcategory_id": uuid.uuid4(),
-                            "title": sub["title"],
-                            "category_id": category_rows[-1]["category_id"],
-                        }
-                    )
+        if category_rows:
+            await session.execute(
+                insert(Category),
+                category_rows,
+            )
 
-            if category_rows:
-                await session.execute(
-                    insert(Category),
-                    category_rows,
-                )
+        if subcategory_rows:
+            await session.execute(
+                insert(SubCategory),
+                subcategory_rows,
+            )
 
-            if subcategory_rows:
-                await session.execute(
-                    insert(SubCategory),
-                    subcategory_rows,
-                )
-
-            await session.commit()
+        await session.commit()
 
     async def get_categories_data(
         self, session: AsyncSession
@@ -191,7 +192,7 @@ class CategoriesDBService(BaseDBInteractions):
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "title"], session: AsyncSession
     ) -> List[str] | None:
-        """Returns all the ids of subcategories."""
+        """Returns all the value in the given column of Subcategory table."""
         match (column):
             case "subcategory_id":
                 statement = select(SubCategory.subcategory_id)
@@ -423,7 +424,7 @@ class CategoriesDBService(BaseDBInteractions):
         user_id: str,
         category_data: CreateCustomCategoryModel,
         session: AsyncSession,
-        pinecone_client: PineconeClient,
+        pinecone_client: PineconeService,
     ) -> ResponseCategoryDataModel:
         """Allows users to create custom categories and subcategories within it."""
 
@@ -568,15 +569,14 @@ class CategoriesDBService(BaseDBInteractions):
                 # Pinecone record deletion is remaining
                 await session.execute(stmt_delete_category)
 
-        return (await self.get_user_categories(user_id=user_id, session=session))
-
+        return await self.get_user_categories(user_id=user_id, session=session)
 
     async def create_custom_subcategory(
         self,
         user_id: str,
         subcategory_data: CreateCustomSubcategoryModel,
         session: AsyncSession,
-        pinecone_client: PineconeClient,
+        pinecone_client: PineconeService,
     ) -> ResponseCategoryDataModel:
         """Allows users to add new subcategories to an existing category."""
         async with session.begin():
@@ -696,7 +696,7 @@ class CategoriesDBService(BaseDBInteractions):
                     UserSubCategory(user_id=user_id, subcategory_id=generated_subcat_id)
                 )
         # Return updated user categories
-        return (await self.get_user_categories(user_id=user_id, session=session))
+        return await self.get_user_categories(user_id=user_id, session=session)
 
     async def delete_custom_subcategory(
         self, user_id: str, subcategory_id: str, session: AsyncSession
@@ -732,9 +732,8 @@ class CategoriesDBService(BaseDBInteractions):
                 await session.execute(stmt_delete_subcategory)
             elif len(associated_users_str) > 1:
                 await session.execute(stmt_delete_user_subcategory)
-        
-        return (await self.get_user_categories(user_id=user_id, session=session))
 
+        return await self.get_user_categories(user_id=user_id, session=session)
 
     async def get_user_subcategories_id(
         self, user_id: str, session: AsyncSession

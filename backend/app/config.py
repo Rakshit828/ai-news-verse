@@ -9,9 +9,11 @@ class Config(BaseSettings):
     ACCESS_TOKEN_EXPIRY_MINUTES: int
 
     CELERY_BROKER_URL: str
+    REDIS_URL: str
 
     PINECONE_API_KEY: str
     PINECONE_HOST: str
+
 
     GROQ_API_KEY: str
 

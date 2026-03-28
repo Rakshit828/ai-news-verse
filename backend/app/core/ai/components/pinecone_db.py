@@ -4,7 +4,7 @@ from app.core.ai.models import (
     PrimaryCategoryRecordResponse,
     SubcategoryCheckResponse,
     CategoryCheckResponse,
-    TopicKeywordRecordResponse
+    TopicKeywordRecordResponse,
 )
 from app.config import CONFIG
 
@@ -23,18 +23,16 @@ from app.constants import (
 )
 
 
-class PineconeClient:
-    _obj: "PineconeClient" = None
-
-    def __init__(self, index):
-        self.index: _IndexAsyncio = index
+class PineconeService:
+    def __init__(self, client: PineconeAsyncio, index: _IndexAsyncio):
+        self._client: PineconeAsyncio | None = client
+        self._index: _IndexAsyncio | None = index
 
     @classmethod
     async def create(cls, index_name: str, api_key: str, host: str):
-        if cls._obj:
-            return cls._obj
-
+        """Creates new pinecone client with new asyncio client and index."""
         client = PineconeAsyncio(api_key=api_key)
+
         if not await client.has_index(index_name):
             await client.create_index_for_model(
                 name=index_name,
@@ -46,14 +44,25 @@ class PineconeClient:
                 },
             )
         index = client.IndexAsyncio(host=host)
-        cls._obj = cls(index)
-        return cls._obj
+        return cls(client, index)
+
+    async def close(self) -> None:
+        await self._index.close()
+        await self._client.close()
+        self._index = None
+        self._client = None
+
+    async def does_namespaces_exist(self) -> bool:
+        logger.info("Checking for data in pinecone.")
+        stats = await self._index.describe_index_stats()
+        namespaces = stats["namespaces"]
+        return True if len(namespaces) > 0 else False
 
     async def check_for_subcategory_existence(
         self, subcategory: str
     ) -> SubcategoryCheckResponse | None:
         try:
-            result = await self.index.search(
+            result = await self._index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
                     "inputs": {"text": f"{subcategory}"},
@@ -80,7 +89,7 @@ class PineconeClient:
         self, category: str
     ) -> CategoryCheckResponse | None:
         try:
-            result = await self.index.search(
+            result = await self._index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
                     "inputs": {"text": f"{category}"},
@@ -102,9 +111,11 @@ class PineconeClient:
         except Exception as e:
             raise e
 
-    async def get_relevant_canonical_topics(self, topic: str, k: int = 4) -> List[TopicKeywordRecordResponse]:
+    async def get_relevant_canonical_topics(
+        self, topic: str, k: int = 4
+    ) -> List[TopicKeywordRecordResponse]:
         try:
-            result = await self.index.search(
+            result = await self._index.search(
                 namespace=PINECONE_CANONICAL_TOPIC_NAMESPACE,
                 query={
                     "inputs": {"text": f"{topic}"},
@@ -113,12 +124,14 @@ class PineconeClient:
                 },
                 fields=["content"],
             )
-            canonical_topics_record: List[TopicKeywordRecordResponse] = result['result']['hits']
+            canonical_topics_record: List[TopicKeywordRecordResponse] = result[
+                "result"
+            ]["hits"]
             logger.debug(
                 f"Relevant subcategories from pinecone: {canonical_topics_record}"
             )
             return canonical_topics_record
-        
+
         except PineconeApiException as exc:
             raise exc
         except Exception as e:
@@ -134,7 +147,7 @@ class PineconeClient:
             raise ValueError("Invalid namespace value")
 
         try:
-            result = await self.index.search(
+            result = await self._index.search(
                 namespace=namespace,
                 query={
                     "inputs": {"text": f"{title}"},
@@ -176,7 +189,7 @@ class PineconeClient:
 
             for batch in chunks(records, 96):
                 logger.debug(f"The batch is : {batch} \n\n")
-                await self.index.upsert_records(
+                await self._index.upsert_records(
                     namespace=upsert_in,
                     records=batch,
                 )
@@ -190,11 +203,12 @@ class PineconeClient:
 
 # async factory
 async def init_pinecone_db():
-    return await PineconeClient.create(
+    return await PineconeService.create(
         index_name=PINECONE_INDEX_NAME,
         api_key=CONFIG.PINECONE_API_KEY,
         host=CONFIG.PINECONE_HOST,
     )
+
 
 
 if __name__ == "__main__":

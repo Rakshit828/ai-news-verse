@@ -2,10 +2,11 @@ from app.db.redis import get_redis, RedisServiceClient
 from fastapi import WebSocket
 from app.models.ai_news_service import NewNewsNotification
 from loguru import logger
+from app.config import CONFIG
 
 class PubSubSystem:
     def __init__(self, redis: RedisServiceClient | None = None):
-        self.__redis: RedisServiceClient = redis if redis else get_redis()
+        self.__redis: RedisServiceClient = redis if redis else get_redis(url=CONFIG.REDIS_URL)
     
     async def publish(self, new_news: list[NewNewsNotification]) -> None:
         """Use to publish same message to different channels."""

@@ -1,5 +1,5 @@
 from .llms import UseLLMsGroq, GroqModelEnum
-from .pinecone_db import PineconeClient, init_pinecone_db
+from .pinecone_db import PineconeService, init_pinecone_db
 from .topic_description_generator import (
     TopicDescription,
     TopicDescriptionGenerator,
@@ -9,7 +9,7 @@ from .topic_description_generator import (
 __all__ = [
     "UseLLMsGroq",
     "GroqModelEnum",
-    "PineconeClient",
+    "PineconeService",
     "init_pinecone_db",
     "TopicDescription",
     "TopicDescriptionGenerator",
