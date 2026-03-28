@@ -4,18 +4,21 @@ from src.db.redis import (
     RedisServiceClientAsync,
     RedisServiceClientSync,
 )
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 from src.models.ai_news_service import NewNewsNotification
 from loguru import logger
 from src.config import CONFIG
 
+redis_client: RedisServiceClientAsync = get_redis_async()
+
 
 class PubSubSystem:
-    def __init__(self, redis: RedisServiceClientAsync | None = None):
-        self.__redis: RedisServiceClientAsync = (
-            redis if redis else get_redis_async(url=CONFIG.REDIS_URL)
-        )
-
+    def __init__(self, redis: RedisServiceClientAsync):
+        self.__redis = redis
+        # We don't create the pubsub object in __init__ 
+        # to ensure it's created within the async context of the request.
+        self._pubsub = None
+    
     async def publish(self, new_news: list[NewNewsNotification]) -> None:
         """Use to publish same message to different channels."""
         for news in new_news:
@@ -24,19 +27,29 @@ class PubSubSystem:
             )
         return
 
-    async def subscribe_and_listen(self, channel_name: str, websocket: WebSocket):
-        pubsub = self.__redis._client.pubsub()
-        await pubsub.subscribe(channel_name)
+    async def listen_multiple(self, channels: list[str], websocket: WebSocket):
+        self._pubsub = self.__redis._client.pubsub()
+        await self._pubsub.subscribe(*channels)
+        
         try:
-            async for message in pubsub.listen():
+            async for message in self._pubsub.listen():
                 if message["type"] == "message":
-                    await websocket.send_text(message["data"])
-        except Exception as e:
-            logger.error(str(e))
+                    try:
+                        await websocket.send_text(message["data"])
+                    except WebSocketDisconnect:
+                        # Explicit handling
+                        logger.info("Client disconnected during send")
+                        break   # exit loop cleanly
         finally:
-            await pubsub.unsubscribe(channel_name)
-            await pubsub.close()
+            # Proper cleanup
+            await self._pubsub.unsubscribe(*channels)
+            await self._pubsub.close()
 
+
+
+# Dependency for the fastapi for pubsub using global/common redis client.
+def get_pubsub_system():
+    return PubSubSystem(redis=redis_client)
 
 
 class CeleryPublisher:

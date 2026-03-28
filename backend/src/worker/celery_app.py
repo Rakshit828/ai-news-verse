@@ -20,7 +20,7 @@ app.conf.update(
 )
 
 
-NEWS_REFETCH_MINUTE = 10
+NEWS_REFETCH_MINUTE = 5
 
 
 CELERY_BEAT_SCHEDULE = {

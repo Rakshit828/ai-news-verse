@@ -28,12 +28,8 @@ services:
     working_dir: /contenerization
     command: bash -c "alembic upgrade head && fastapi run src"
     env_file:
-      - ./.env
+      - ./.env.docker
     environment:
-      REDIS_URL: redis://redis:6379/1
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/ai_news
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
@@ -48,17 +44,13 @@ services:
     working_dir: /contenerization
     command: celery -A src.worker.celery_app worker --loglevel=info --concurrency=5 --events
     env_file:
-      - ./.env
+      - ./.env.docker
     environment:
-      # Used redis_url so that the tasks created can connect to the container redis.
-      REDIS_URL: redis://redis:6379/1
-      DATABASE_URL_SYNC: postgresql+psycopg2://postgres:postgres@postgres:5432/ai_news
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
       PYTHONUNBUFFERED: "1"
     depends_on:
       - postgres
       - redis
+      - api
     restart: unless-stopped
 
   celery_beat:
@@ -67,18 +59,15 @@ services:
     working_dir: /contenerization
     command: celery -A src.worker.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid --schedule=/tmp/celerybeat-schedule
     env_file:
-      - ./.env
+      - ./.env.docker
     environment:
-      # Used redis_url so that the tasks created can connect to the container redis.
-      REDIS_URL: redis://redis:6379/1
-      DATABASE_URL_SYNC: postgresql+psycopg2://postgres:postgres@postgres:5432/ai_news
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
       PYTHONUNBUFFERED: "1"
     depends_on:
       - postgres
       - redis
+      - api
     restart: unless-stopped
+
 
 volumes:
   postgres-data:

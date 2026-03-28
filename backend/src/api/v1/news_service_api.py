@@ -27,10 +27,11 @@ from src.models.ai_news_service import (
     ResponseCategoryDataModel,
 )
 from src.services.ai_news_service import NewsDBService, CategoriesDBService
-from src.services.notification_system import PubSubSystem
 from src.core.ai.components.pinecone_db import PineconeServiceAsync
 from src.services.utils import safely_run_controllers
+from src.services.notification_system import PubSubSystem, get_pubsub_system
 from src.db.dependencies import get_session
+from src.db.main import Session
 from src.response import SuccessResponse
 from loguru import logger
 
@@ -39,27 +40,23 @@ news_routes = APIRouter()
 
 category_service = CategoriesDBService()
 news_service = NewsDBService()
-redis_pubsub = PubSubSystem()
 
 
 @news_routes.websocket("/ws/livenews")
 async def websocket_endpoint(
     websocket: WebSocket,
     token_data=Depends(AccessTokenBearerForWS()),
-    session: AsyncSession = Depends(get_session),
+    pubsub: PubSubSystem = Depends(get_pubsub_system)
 ):
     user_id = token_data["sub"]
     logger.debug(f"Client {user_id} is trying to connect.")
-    # Accepting a connection
     await websocket.accept()
     logger.info(f"Client with id: {user_id} connected successfully.")
 
-    categories_data: ResponseCategoryDataModel = await safely_run_controllers(
-        func=category_service.get_user_categories, user_id=user_id, session=session
-    )
-
-    # We have to close it because it will remain intact in the websocket connection.
-    await session.close()
+    async with Session() as session:
+        categories_data: ResponseCategoryDataModel = await safely_run_controllers(
+            func=category_service.get_user_categories, user_id=user_id, session=session
+        )
 
     # Channels is a list of the user subcategories ids.
     channels: list[str] = [
@@ -68,21 +65,16 @@ async def websocket_endpoint(
         for subcategory in category.subcategories
     ]
 
-    # Create a task per category
-    tasks = [
-        asyncio.create_task(redis_pubsub.subscribe_and_listen(channel, websocket))
-        for channel in channels
-    ]
     try:
-        await asyncio.gather(*tasks)
+        await pubsub.listen_multiple(channels=channels, websocket=websocket)
     except WebSocketDisconnect:
         logger.info(f"Client with user_id: {user_id} disconnected.")
-        for task in tasks:
-            task.cancel()
+
     except Exception as e:
         logger.error(str(e))
     finally:
-        websocket.close()
+        if not websocket.client_state.name == "DISCONNECTED":
+            await websocket.close()
 
 
 @news_routes.get(

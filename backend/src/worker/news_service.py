@@ -44,7 +44,8 @@ class WorkerNewsService:
             session.add(article_orm)
             if len(user_defined_classification) != 0:
                 session.add_all(user_defined_classification)
-
+            
+            session.commit()
             return article_orm
 
 
@@ -85,7 +86,8 @@ class WorkerNewsService:
         if len(classification_orms) != 0:
             for classification_orm in classification_orms:
                 session.add_all(classification_orm)
-
+        session.commit()
+        
         return
 
     def check_guid(self, guid: str, source: str, session: Session):

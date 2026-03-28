@@ -5,13 +5,13 @@ from ..config import CONFIG
 
 Base = declarative_base()
 
-from sqlalchemy import create_engine
 
 # Async engine
 async_engine = create_async_engine(
     url=CONFIG.DATABASE_URL,
-    pool_size=10,
-    max_overflow=20
+    pool_size=20,
+    max_overflow=10,
+    pool_timeout=10,
 )
 
 # Async Session

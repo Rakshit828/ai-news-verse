@@ -1,4 +1,4 @@
-from fastapi import Request, Depends, WebSocket
+from fastapi import Request, Depends, WebSocket, WebSocketException, status
 from fastapi.security import APIKeyCookie
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
@@ -42,23 +42,22 @@ class AccessTokenBearer(APIKeyCookie):
         return decoded_token
 
 
+
 class AccessTokenBearerForWS:
     def __init__(self, cookie_name: str = "access_token"):
         self.cookie_name = cookie_name
 
-    async def __call__(self, request_or_ws: WebSocket):
-        # Extract cookie depending on type
-        access_token = request_or_ws.cookies.get(self.cookie_name)
+    async def __call__(self, websocket: WebSocket):
+        token = websocket.cookies.get(self.cookie_name)
 
-        if not access_token:
-            # For WebSocket, we must accept then close or raise WebSocketException
-            if isinstance(request_or_ws, WebSocket):
-                await request_or_ws.close(code=1008)  # Policy Violation
-                return None
-            raise AppError(InvalidJWTTokenError())
+        if not token:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
 
-        decoded_token = decode_jwt_tokens(jwt_token=access_token)
-        return decoded_token
+        try:
+            return decode_jwt_tokens(token)
+        
+        except AppError:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
 
 
 async def get_current_user(

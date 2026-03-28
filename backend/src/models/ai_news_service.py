@@ -10,7 +10,7 @@ class NewNewsNotification(BaseModel):
     guid: str
     title: str
     link: str
-    source: Literal['OPNEAI', 'GOOGLE', 'HACKERNOON', 'ANTHROPIC']
+    source: Literal['OPENAI', 'GOOGLE', 'HACKERNOON', 'ANTHROPIC']
     category_id: str | None = None
     subcategory_id: str
     description: str | None = None
