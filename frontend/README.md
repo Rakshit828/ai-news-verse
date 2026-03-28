@@ -1,73 +1,33 @@
-# React + TypeScript + Vite
+# 🎨 AI NewsVerse - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A sleek, responsive, and performance-oriented frontend for AI NewsVerse. Built with React 19 and Tailwind CSS 4.
 
-Currently, two official plugins are available:
+## 📡 Tech Stack
+- **React 19:** Next-gen React experience with Vite.
+- **TypeScript:** Type-safe development with modern JS features.
+- **Tailwind CSS 4:** Modern and lightweight utility-first CSS framework.
+- **Zustand:** Ultra-fast, minimal state management.
+- **TanStack Query (v5):** Asynchronous data fetching, caching, and state synchronization.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
+- **Dynamic Category Management:** Create and personalize your news feed in real-time.
+- **AI Summary Visualization:** Modern, clean cards with AI-generated insights.
+- **Real-time Notifications:** Feed update notifications via WebSockets.
+- **Mobile Responsive:** Optimized for mobile, tablet, and desktop views.
+- **Zustand Store:** Centralized data for user sessions and personalization settings.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🚀 Setup & Installation
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Configure `.env`:
+   - `VITE_API_BASE_URL`: The URL of your FastAPI backend.
+3. Start the Development Server:
+   ```bash
+   npm run dev
+   ```
+4. Build for Production:
+   ```bash
+   npm run build
+   ```
