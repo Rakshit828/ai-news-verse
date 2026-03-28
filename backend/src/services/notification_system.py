@@ -9,7 +9,7 @@ from src.models.ai_news_service import NewNewsNotification
 from loguru import logger
 from src.config import CONFIG
 
-redis_client: RedisServiceClientAsync = get_redis_async()
+redis_client: RedisServiceClientAsync = get_redis_async(url=CONFIG.REDIS_URL)
 
 
 class PubSubSystem:

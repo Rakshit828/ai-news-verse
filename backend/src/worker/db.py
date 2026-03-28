@@ -16,7 +16,6 @@ sync_engine = create_engine(
     pool_timeout=10,
 )
 
-
 # sync Session
 GetLocalSession = sessionmaker(
     bind=sync_engine,

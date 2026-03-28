@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from src.response import AppError
 from src.api.v1.auth_api import auth_routes
 from src.api.v1.news_service_api import news_routes
+from src.api.v1.monitoring_api import monitoring_routes
 from loguru import logger
 from src.core.ai.components import PineconeServiceAsync, init_pinecone_db_async
 from src.core.ai.pipeline._initialize_pinecone import run_init_pinecone_pipeline
@@ -96,6 +97,5 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 app.include_router(news_routes, tags=["News"], prefix=f"/api/{VERSION}/news")
 app.include_router(auth_routes, tags=["Authentication"], prefix=f"/api/{VERSION}/auth")
-
-
+app.include_router(monitoring_routes, tags=["Monitoring"], prefix=f"/api/{VERSION}/m")
 

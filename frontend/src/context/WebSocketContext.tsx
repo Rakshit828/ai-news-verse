@@ -3,7 +3,6 @@ import { createContext, useContext, useState, useCallback, useMemo } from "react
 import { useWebSocket, type WebSocketStatus } from "@/hooks/useWebSocket";
 import type { LiveNewsNotification } from "@/types/news.types";
 import type { Article } from "@/types/news.types";
-import toast from "react-hot-toast";
 
 interface WebSocketContextValue {
     /** Current connection state */
@@ -58,20 +57,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         });
 
         setUnreadCount((c) => c + 1);
-
-        // Show a subtle toast
-        toast(`🔴 ${notification.title}`, {
-            duration: 4000,
-            position: "bottom-right",
-            style: {
-                fontSize: "13px",
-                maxWidth: "360px",
-                background: "var(--color-bg-card)",
-                color: "var(--color-text-primary)",
-                border: "1px solid var(--color-border-primary)",
-                borderRadius: "var(--radius-md)",
-            },
-        });
     }, []);
 
     const { status, connect, disconnect } = useWebSocket({

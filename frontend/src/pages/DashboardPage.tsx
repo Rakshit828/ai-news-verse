@@ -97,7 +97,7 @@ export default function DashboardPage() {
   const { data, isLoading, isError } = useTodayNews();
   const { data: categoriesData } = useCategories();
   const { data: userCategoriesData } = useUserCategories();
-  const { liveArticles, unreadCount, markAllRead } = useWebSocketContext();
+  const { liveArticles } = useWebSocketContext();
 
   const [filterSource, setFilterSource] = useState<NewsSource | "ALL">("ALL");
 
@@ -128,12 +128,6 @@ export default function DashboardPage() {
     }
   }, [liveArticles]);
 
-  // Mark as read when user is on the page
-  useEffect(() => {
-    if (unreadCount > 0) {
-      markAllRead();
-    }
-  }, [unreadCount, markAllRead]);
 
   // Mapping for ID to Title
   const { categoryMap, subcategoryMap } = useMemo(() => {
@@ -184,9 +178,6 @@ export default function DashboardPage() {
     if (filterSource === "ALL") return allArticles;
     return allArticles.filter(a => a.source === filterSource);
   }, [allArticles, filterSource]);
-
-  const liveCount = liveArticles.length;
-
   return (
     <div className="dashboard-page animate-fade-in">
       <header className="page-header">
@@ -199,13 +190,6 @@ export default function DashboardPage() {
             <p className="page-subtitle">Your personalized intelligence feed</p>
           </div>
         </div>
-
-        {liveCount > 0 && (
-          <div className="live-counter animate-scale-in">
-            <Zap size={14} />
-            <span>{liveCount} live update{liveCount > 1 ? "s" : ""}</span>
-          </div>
-        )}
       </header>
 
       <nav className="filter-bar-container">
@@ -348,20 +332,6 @@ export default function DashboardPage() {
           font-weight: 500;
         }
 
-        /* ── Live counter badge ── */
-        .live-counter {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 16px;
-          border-radius: var(--radius-full);
-          background: rgba(34, 197, 94, 0.1);
-          color: #22c55e;
-          font-size: 13px;
-          font-weight: 700;
-          border: 1px solid rgba(34, 197, 94, 0.25);
-          white-space: nowrap;
-        }
 
         .filter-bar-container {
           position: sticky;
