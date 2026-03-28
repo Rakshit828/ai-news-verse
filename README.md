@@ -31,6 +31,10 @@ An news aggregation platform that delivers deeply personalized, curated insights
 - **📦 Background Processing:** Robust background workers (Celery) periodically fetch news from diverse RSS feeds and process them without affecting application performance.
 ---
 
+## 🐛 Known Issues
+- News Classification may be inaccurate sometimes.
+- There may be websocket scalability issue.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
