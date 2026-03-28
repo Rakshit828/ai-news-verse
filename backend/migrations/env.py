@@ -12,10 +12,10 @@ from alembic import context
 config = context.config
 
 
-from app.db.main import Base
-from app.db.schemas.ai_news_service import *
-from app.db.schemas.core import *
-from app.config import CONFIG
+from src.db.main import Base
+from src.db.schemas.ai_news_service import *
+from src.db.schemas.core import *
+from src.config import CONFIG
 
 config.set_main_option('sqlalchemy.url', CONFIG.DATABASE_URL)
 
