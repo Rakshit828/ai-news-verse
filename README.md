@@ -1,19 +1,16 @@
 # 🚀 AI NewsVerse
 
-An advanced, AI-powered news aggregation platform that delivers deeply personalized, curated insights from premium sources. Using state-of-the-art Large Language Models (LLMs) and Vector Databases, AI NewsVerse intelligent classifies and summarizes news to keep you ahead of the curve.
+An news aggregation platform that delivers deeply personalized, curated insights from premium sources.
 
-![Main Interface Mockup](https://raw.githubusercontent.com/Rakshit828/ai-news-verse/main/preview.png)
 
 ## 📡 Tech Stack
 
 ### Backend
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Asynchronous Python)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy](https://www.sqlalchemy.org/) & [Alembic](https://alembic.sqlalchemy.org/)
-- **Vector DB:** [Pinecone](https://www.pinecone.io/) for semantic search and classification
-- **AI/LLM:** [Groq](https://groq.com/), [Anthropic](https://www.anthropic.com/), and [OpenAI](https://openai.com/) integrations
+- **Vector DB:** [Pinecone](https://www.pinecone.io/) for news classification
+- **AI/LLM:** [Groq](https://groq.com/)
 - **Task Queue:** [Celery](https://docs.celeryq.dev/) with [Redis](https://redis.io/) for periodic news fetching
-- **Auth:** JWT with Argon2 password hashing
-- **Logging:** [Loguru](https://github.com/Delgan/loguru)
 
 ### Frontend
 - **Framework:** [React 19](https://react.dev/) with [Vite](https://vitejs.dev/)
@@ -28,14 +25,15 @@ An advanced, AI-powered news aggregation platform that delivers deeply personali
 
 ## ✨ Key Features
 
-- **🤖 AI-Driven Classification:** News articles are automatically classified into categories and subcategories using semantic vector search (Pinecone) and LLM-based reasoning (Groq).
+- **🤖 AI-Driven Classification:** News articles are automatically classified into categories and subcategories using semantic vector search (Pinecone).
 - **🎭 Personalization:** Users can create custom categories and subcategories. The system validates them using AI to ensure they are meaningful topics.
 - **⚡ Real-time Updates:** Stay updated with live news feeds powered by WebSockets and notification systems.
 - **📦 Background Processing:** Robust background workers (Celery) periodically fetch news from diverse RSS feeds and process them without affecting application performance.
-- **🛡️ Secure Auth:** Performance-oriented authentication system using JWT and modern hashing algorithms.
-- **🎨 Premium UI:** A modern, glassmorphic design built with Tailwind CSS 4, providing a seamless user experience across all devices.
-
 ---
+
+## 🐛 Known Issues
+- News Classification may be inaccurate sometimes.
+- There may be websocket scalability issue.
 
 ## 🚀 Getting Started
 
@@ -97,10 +95,10 @@ An advanced, AI-powered news aggregation platform that delivers deeply personali
 ├── backend/
 │   ├── src/
 │   │   ├── api/          # FastAPI routes
-│   │   ├── core/         # AI components, Pinecone, LLM logic
+│   │   ├── core/         # AI components, Pinecone, LLM logic, News Scrapers
 │   │   ├── db/           # SQLAlchemy models and migrations
 │   │   ├── services/     # Business logic (News, Auth, Filters)
-│   │   └── worker/       # Celery tasks
+│   │   └── worker/       # Celery worker code
 ├── frontend/
 │   ├── src/
 │   │   ├── components/   # Reusable UI components
