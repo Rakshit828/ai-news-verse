@@ -1,0 +1,8 @@
+# Using the base image built from Dockerfile.base
+
+FROM ai-news-backend-base:latest  
+
+WORKDIR /contenerization
+
+# Copy app code
+COPY . .

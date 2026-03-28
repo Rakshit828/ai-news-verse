@@ -6,7 +6,7 @@ from loguru import logger
 
 
 
-@app.task(name="app.background_tasks.tasks.fetch_classify_notify")
+@app.task(name="src.worker.tasks.fetch_classify_notify")
 def fetch_classify_notify(
     source: Literal["OPENAI", "GOOGLE", "ANTHROPIC", "HACKERNOON"],
 ):

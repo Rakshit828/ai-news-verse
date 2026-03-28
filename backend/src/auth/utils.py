@@ -102,3 +102,4 @@ def decode_jwt_tokens(jwt_token: str, is_refresh: bool = False):
         )
     except InvalidTokenError:
         raise AppError(InvalidJWTTokenError())
+

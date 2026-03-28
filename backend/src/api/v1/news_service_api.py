@@ -57,6 +57,10 @@ async def websocket_endpoint(
     categories_data: ResponseCategoryDataModel = await safely_run_controllers(
         func=category_service.get_user_categories, user_id=user_id, session=session
     )
+
+    # We have to close it because it will remain intact in the websocket connection.
+    await session.close()
+
     # Channels is a list of the user subcategories ids.
     channels: list[str] = [
         str(subcategory.subcategory_id)
@@ -77,6 +81,8 @@ async def websocket_endpoint(
             task.cancel()
     except Exception as e:
         logger.error(str(e))
+    finally:
+        websocket.close()
 
 
 @news_routes.get(

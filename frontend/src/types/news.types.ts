@@ -91,3 +91,17 @@ export interface TodayNewsResponse {
   openai?: Article[];
   hackernoon?: Article[];
 }
+
+// ─── WebSocket Live Notification ──────────────────────────────────────────────
+
+/** Shape of the JSON message pushed over the WebSocket (matches backend NewNewsNotification) */
+export interface LiveNewsNotification {
+  guid: string;
+  title: string;
+  link: string;
+  source: NewsSource | "OPNEAI"; // backend has a typo for OPENAI in some places
+  category_id: string | null;
+  subcategory_id: string;
+  description: string | null;
+  summary: string | null;
+}

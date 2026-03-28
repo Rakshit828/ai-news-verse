@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { queryClient } from "@/lib/queryClient";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { WebSocketProvider } from "@/context/WebSocketContext";
 
 interface AppProvidersProps {
   children: React.ReactNode;
@@ -14,7 +15,9 @@ export default function AppProviders({ children }: AppProvidersProps) {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          {children}
+          <WebSocketProvider>
+            {children}
+          </WebSocketProvider>
           <Toaster
             position="top-right"
             toastOptions={{

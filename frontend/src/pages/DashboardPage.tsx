@@ -1,8 +1,9 @@
 // src/pages/DashboardPage.tsx
 import { useTodayNews, useCategories, useUserCategories } from "@/hooks/useNews";
+import { useWebSocketContext } from "@/context/WebSocketContext";
 import type { Article, NewsSource } from "@/types/news.types";
-import { Newspaper, ExternalLink, Inbox, Tag } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Newspaper, ExternalLink, Inbox, Tag, Zap } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 
 const SOURCE_CONFIG: Record<
@@ -18,11 +19,13 @@ const SOURCE_CONFIG: Record<
 function ArticleCard({
   article,
   categoryTitle,
-  subcategoryTitle
+  subcategoryTitle,
+  isLive = false,
 }: {
   article: Article;
   categoryTitle?: string;
   subcategoryTitle?: string;
+  isLive?: boolean;
 }) {
   const cfg = SOURCE_CONFIG[article.source] ?? {
     label: article.source,
@@ -35,15 +38,23 @@ function ArticleCard({
   const displayDescription = article.source === 'GOOGLE' ? "No Description" : article.description;
 
   return (
-    <div className="article-card">
+    <div className={`article-card ${isLive ? "article-card--live" : ""}`}>
       <div className="article-card-header">
         <div className="article-meta-group">
-          <span
-            className="article-source-badge"
-            style={{ color: cfg.color, background: cfg.bg }}
-          >
-            {cfg.label}
-          </span>
+          <div className="article-badges-row">
+            <span
+              className="article-source-badge"
+              style={{ color: cfg.color, background: cfg.bg }}
+            >
+              {cfg.label}
+            </span>
+            {isLive && (
+              <span className="article-live-badge">
+                <Zap size={10} />
+                LIVE
+              </span>
+            )}
+          </div>
           {(categoryTitle || subcategoryTitle) && (
             <div className="article-category-info">
               <Tag size={10} />
@@ -86,8 +97,43 @@ export default function DashboardPage() {
   const { data, isLoading, isError } = useTodayNews();
   const { data: categoriesData } = useCategories();
   const { data: userCategoriesData } = useUserCategories();
+  const { liveArticles, unreadCount, markAllRead } = useWebSocketContext();
 
   const [filterSource, setFilterSource] = useState<NewsSource | "ALL">("ALL");
+
+  // Track which live article GUIDs (urls) have been "seen" for animation
+  const seenLiveRef = useRef<Set<string>>(new Set());
+  const [newLiveUrls, setNewLiveUrls] = useState<Set<string>>(new Set());
+
+  // When new live articles arrive, flag them as "new" for the slide-in animation
+  useEffect(() => {
+    const fresh = new Set<string>();
+    liveArticles.forEach((a) => {
+      if (!seenLiveRef.current.has(a.url)) {
+        fresh.add(a.url);
+        seenLiveRef.current.add(a.url);
+      }
+    });
+    if (fresh.size > 0) {
+      setNewLiveUrls((prev) => new Set([...prev, ...fresh]));
+      // After animation remove the "new" flag
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setTimeout(() => {
+        setNewLiveUrls((prev) => {
+          const next = new Set(prev);
+          fresh.forEach((u) => next.delete(u));
+          return next;
+        });
+      }, 800);
+    }
+  }, [liveArticles]);
+
+  // Mark as read when user is on the page
+  useEffect(() => {
+    if (unreadCount > 0) {
+      markAllRead();
+    }
+  }, [unreadCount, markAllRead]);
 
   // Mapping for ID to Title
   const { categoryMap, subcategoryMap } = useMemo(() => {
@@ -109,12 +155,12 @@ export default function DashboardPage() {
     return { categoryMap: cMap, subcategoryMap: sMap };
   }, [categoriesData, userCategoriesData]);
 
-  // Flatten all sources into one list
-  const allArticles: Article[] = useMemo(() => {
+  // Flatten all REST-fetched sources into one list
+  const restArticles: Article[] = useMemo(() => {
     if (!data) return [];
 
     // Support both direct data and nested data.data structure just in case
-    const articlesSource = (data as any).data || data;
+    const articlesSource = (data && "data" in data ? (data as Record<string, unknown>).data : data) as typeof data;
 
     return [
       ...(Array.isArray(articlesSource.google) ? articlesSource.google : []),
@@ -124,11 +170,22 @@ export default function DashboardPage() {
     ];
   }, [data]);
 
+  // Build a set of live-article URLs for dedup
+  const liveUrlSet = useMemo(() => new Set(liveArticles.map((a) => a.url)), [liveArticles]);
+
+  // Combine: live articles first, then REST articles (deduplicated)
+  const allArticles = useMemo(() => {
+    const deduped = restArticles.filter((a) => !liveUrlSet.has(a.url));
+    return [...liveArticles, ...deduped];
+  }, [liveArticles, restArticles, liveUrlSet]);
+
   // Filter based on selected source
   const filteredArticles = useMemo(() => {
     if (filterSource === "ALL") return allArticles;
     return allArticles.filter(a => a.source === filterSource);
   }, [allArticles, filterSource]);
+
+  const liveCount = liveArticles.length;
 
   return (
     <div className="dashboard-page animate-fade-in">
@@ -142,6 +199,13 @@ export default function DashboardPage() {
             <p className="page-subtitle">Your personalized intelligence feed</p>
           </div>
         </div>
+
+        {liveCount > 0 && (
+          <div className="live-counter animate-scale-in">
+            <Zap size={14} />
+            <span>{liveCount} live update{liveCount > 1 ? "s" : ""}</span>
+          </div>
+        )}
       </header>
 
       <nav className="filter-bar-container">
@@ -217,19 +281,24 @@ export default function DashboardPage() {
 
       {!isLoading && filteredArticles.length > 0 && (
         <div className="articles-grid">
-          {filteredArticles.map((article, i) => (
-            <div
-              key={`${article.url}-${i}`}
-              className="article-wrapper"
-              style={{ "--delay": `${Math.min(i * 0.05, 1)}s` } as any}
-            >
-              <ArticleCard
-                article={article}
-                categoryTitle={article.category_id ? categoryMap[article.category_id] : undefined}
-                subcategoryTitle={article.subcategory_id ? subcategoryMap[article.subcategory_id] : undefined}
-              />
-            </div>
-          ))}
+          {filteredArticles.map((article, i) => {
+            const isLive = liveUrlSet.has(article.url);
+            const isNew = newLiveUrls.has(article.url);
+            return (
+              <div
+                key={`${article.url}-${i}`}
+                className={`article-wrapper ${isNew ? "article-wrapper--slide-in" : ""}`}
+                style={{ "--delay": `${Math.min(i * 0.05, 1)}s` } as React.CSSProperties}
+              >
+                <ArticleCard
+                  article={article}
+                  isLive={isLive}
+                  categoryTitle={article.category_id ? categoryMap[article.category_id] : undefined}
+                  subcategoryTitle={article.subcategory_id ? subcategoryMap[article.subcategory_id] : undefined}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -277,6 +346,21 @@ export default function DashboardPage() {
           color: var(--color-text-secondary);
           margin-top: 4px;
           font-weight: 500;
+        }
+
+        /* ── Live counter badge ── */
+        .live-counter {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          border-radius: var(--radius-full);
+          background: rgba(34, 197, 94, 0.1);
+          color: #22c55e;
+          font-size: 13px;
+          font-weight: 700;
+          border: 1px solid rgba(34, 197, 94, 0.25);
+          white-space: nowrap;
         }
 
         .filter-bar-container {
@@ -341,6 +425,22 @@ export default function DashboardPage() {
           will-change: transform, opacity;
         }
 
+        /* ── Slide-in animation for new live articles ── */
+        .article-wrapper--slide-in {
+          animation: liveSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes liveSlideIn {
+          0% {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.97);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
         .article-card {
           background: var(--color-bg-card);
           border: 1px solid var(--color-border-primary);
@@ -359,6 +459,17 @@ export default function DashboardPage() {
           border-color: var(--color-accent-glow);
         }
 
+        /* ── Live article card glow ── */
+        .article-card--live {
+          border-color: rgba(34, 197, 94, 0.3);
+          box-shadow: var(--shadow-card), 0 0 20px rgba(34, 197, 94, 0.08);
+        }
+
+        .article-card--live:hover {
+          border-color: rgba(34, 197, 94, 0.5);
+          box-shadow: var(--shadow-card-hover), 0 0 32px rgba(34, 197, 94, 0.15);
+        }
+
         .article-card-header {
           display: flex;
           align-items: flex-start;
@@ -372,6 +483,12 @@ export default function DashboardPage() {
           gap: 8px;
         }
 
+        .article-badges-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
         .article-source-badge {
           align-self: flex-start;
           font-size: 11px;
@@ -380,6 +497,28 @@ export default function DashboardPage() {
           border-radius: var(--radius-sm);
           text-transform: uppercase;
           letter-spacing: 0.8px;
+        }
+
+        /* ── LIVE badge ── */
+        .article-live-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 10px;
+          font-weight: 800;
+          padding: 3px 10px;
+          border-radius: var(--radius-sm);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: #22c55e;
+          background: rgba(34, 197, 94, 0.12);
+          border: 1px solid rgba(34, 197, 94, 0.25);
+          animation: livePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.65; }
         }
 
         .article-category-info {
@@ -525,6 +664,7 @@ export default function DashboardPage() {
           .article-desc { font-size: 13px; -webkit-line-clamp: 2; }
           .status-container { padding: 40px 16px; }
           .error-card, .empty-state { padding: 28px 20px; }
+          .live-counter { font-size: 12px; padding: 6px 12px; }
         }
 
         @media (max-width: 480px) {

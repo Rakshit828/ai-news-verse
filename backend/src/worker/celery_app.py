@@ -7,7 +7,7 @@ app = Celery(
     broker=CONFIG.CELERY_BROKER_URL,
 )
 
-app.autodiscover_tasks(["app.worker"])
+app.autodiscover_tasks(["src.worker"])
 
 
 # Optional global configuration
@@ -25,22 +25,22 @@ NEWS_REFETCH_MINUTE = 10
 
 CELERY_BEAT_SCHEDULE = {
     "fetch_classify_notify_openai": {
-        "task": "app.worker.tasks.fetch_classify_notify",
+        "task": "src.worker.tasks.fetch_classify_notify",
         "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
         "args": ("OPENAI",),
     },
     "fetch_classify_notify_anthropic": {
-        "task": "app.worker.tasks.fetch_classify_notify",
+        "task": "src.worker.tasks.fetch_classify_notify",
         "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
         "args": ("ANTHROPIC",),
     },
     "fetch_classify_notify_hackernoon": {
-        "task": "app.worker.tasks.fetch_classify_notify",
+        "task": "src.worker.tasks.fetch_classify_notify",
         "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
         "args": ("HACKERNOON",),
     },
     "fetch_classify_notify_google": {
-        "task": "app.worker.tasks.fetch_classify_notify",
+        "task": "src.worker.tasks.fetch_classify_notify",
         "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
         "args": ("GOOGLE",),
     },

@@ -229,7 +229,6 @@ class PineconeServiceSync:
 
     def close(self) -> None:
         self._index.close()
-        self._client.close()
         self._index = None
         self._client = None
 
