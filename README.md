@@ -45,7 +45,24 @@ An news aggregation platform that delivers deeply personalized, curated insights
 - Pinecone API Key
 - Groq/OpenAI API Key
 
-### Backend Setup
+### Backend Setup using Docker (Recommended)
+1. Build the base image
+   ```bash
+   docker build -f Dockerfile.base -t ai-news-backend-base:latest .
+   # This will install python and all the required images.
+   ```
+2. Build image for api service and celery
+    ```bash
+   docker build -f Dockerfile -t ai-news-backend:latest .
+   # This will make the base image to be used by api service and celery.
+   ```
+3. User docker compose
+   ```bash
+   docker compose up --build
+   ```
+Boom! Your entire infra is ready.
+
+### Backend Setup (Normal)
 1. Navigate to the backend directory:
    ```bash
    cd backend
@@ -70,6 +87,8 @@ An news aggregation platform that delivers deeply personalized, curated insights
    ```bash
    celery -A src.worker.celery_app worker --loglevel=info
    ```
+
+
 
 ### Frontend Setup
 1. Navigate to the frontend directory:

@@ -1,11 +1,15 @@
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Literal, Union
 from loguru import logger
 
 from src.db.schemas.ai_news_service import Articles
 from src.worker.db import GetLocalSession
 from sqlalchemy.orm import Session
 from src.worker.news_service import WorkerNewsService
-from src.core.news_service.types import ServiceArticle
+from src.core.news_service.custom_types import (
+    ServiceArticle,
+    ScrapedData,
+    GoogleScrapedData,
+)
 from src.core.ai.models import ClassificationResponse
 from src.core.news_service.sources import (
     OpenAiService,
@@ -22,30 +26,20 @@ class InvalidArgument(Exception):
     pass
 
 
-def deduplicate(entries: list[dict]) -> list[dict]:
-    seen = set()
-    unique_entries = []
-    for entry in entries:
-        guid = entry["guid"]
-        if guid not in seen:
-            seen.add(guid)
-            unique_entries.append(entry)
-
-    entries = unique_entries
-    return entries
-
-
-def check_for_unique_titles(entries) -> list[dict]:
+def check_for_unique_titles(
+    entries: list[GoogleScrapedData],
+) -> list[GoogleScrapedData]:
+    """Checks for unique titles. Only for google scraped data. Since they have multiple sources."""
     # splitting by '-' separte title from source.
     seen = set()
     unique_entries = []
     for entry in entries:
-        splitted = entry["title"].split("-")
+        splitted = entry.title.split("-")
         if len(splitted) != 1:
             splitted.pop(-1)
         title_without_src = "-".join(splitted).strip()
         if title_without_src not in seen:
-            entry["title"] = title_without_src
+            entry.title = title_without_src
             seen.add(title_without_src)
             unique_entries.append(entry)
 
@@ -139,40 +133,41 @@ class NewsRepository:
         )
         return False if check is None else True
 
-    def process_entry(
-        self, entry: dict, scrape_content: bool = True, classify: bool = True
+    def scrape_url_and_classify(
+        self,
+        entry: ScrapedData,
+        scrape_content: bool = True,
+        classify: bool = True,
     ) -> ServiceArticle:
-        """Scrapes the content, classifies it, converts to service article and returns it."""
-        markdown_content = None
-        classification_response = None
         if scrape_content:
-            markdown_content = self.current_service.scraper.scrape_url(
-                url=entry.get("link"), content_format="markdown"
-            )
+            entry: ScrapedData = self.current_service.scrape_url(scraped_entry=entry)
         if classify:
-            classification_response: ClassificationResponse = self.classifier.run(
-                title=entry.get("title")
+            classification: ClassificationResponse = self.classifier.run(
+                title=entry.title
             )
+
         service_article: ServiceArticle = self.current_service.to_service_article(
             entry=entry,
-            classified_category=classification_response,
-            markdown_content=markdown_content,
+            classification=classification,
         )
-
         return service_article
 
     def _commit_on_each_entries_preprocessor(
         self,
-        entries: list[dict],
+        entries: list[ScrapedData],
         pubsub: CeleryPublisher,
-        scrape_content: bool = False,
+        scrape_content: bool = True,
         classify: bool = True,
     ) -> int:
         no_of_articles = 0
         for entry in entries:
-            service_article: ServiceArticle = self.process_entry(
-                entry=entry, scrape_content=scrape_content, classify=classify
+            service_article: ServiceArticle = self.scrape_url_and_classify(
+                entry=entry,
+                scrape_content=scrape_content,
+                classify=classify,
             )
+            logger.info(f"Article processed: {service_article.title}")
+
             if service_article is not None:
                 with GetLocalSession() as session:
                     article: Articles = self.db.create_article(
@@ -191,16 +186,19 @@ class NewsRepository:
 
     def _bulk_commit_entries_preproocessor(
         self,
-        entries: list[dict],
+        entries: list[ScrapedData],
         pubsub: CeleryPublisher,
-        scrape_content: bool = False,
+        scrape_content: bool = True,
         classify: bool = True,
     ) -> int:
         classified_articles: List[ServiceArticle] = []
         for entry in entries:
-            service_article: ServiceArticle = self.process_entry(
-                entry=entry, scrape_content=scrape_content, classify=classify
+            service_article: ServiceArticle = self.scrape_url_and_classify(
+                entry=entry,
+                scrape_content=scrape_content,
+                classify=classify,
             )
+
             logger.info(f"Article processed: {service_article.title}")
 
             if service_article is not None:
@@ -233,23 +231,19 @@ class NewsRepository:
         if pubsub is None:
             pubsub = CeleryPublisher()
 
-        entries: list[dict] = self.current_service.scraper.get_entries_from_rss_feed(
+        entries: ScrapedData = self.current_service.fetch_rss_feed(
             cutoff_hours=cutoff_hours
         )
 
         if not entries:
-            print(f"No new entries found for {self.current_service.__class__.__name__}")
             return 0
 
-        # ---- ADD DEDUPLICATION HERE ----
-        unique_entries: list[dict] = deduplicate(entries)
         if source == "GOOGLE":
-            unique_entries: list[dict] = check_for_unique_titles(unique_entries)
-        # --------------------------------
+            unique_entries: list[dict] = check_for_unique_titles(entries)
+            entries = unique_entries
 
-        entries: list[dict] = unique_entries
+        all_guids = {entry.id for entry in entries}
 
-        all_guids = {entry["guid"] for entry in entries}
         logger.debug(f"{len(all_guids)} are scraped.")
 
         with GetLocalSession() as session:
@@ -264,7 +258,7 @@ class NewsRepository:
         logger.debug(f"{len(already_existing)} entires already existed.")
 
         # This creates all the valid guids to be stored in the db
-        entries = [entry for entry in entries if entry["guid"] not in already_existing]
+        entries = [entry for entry in entries if entry.id not in already_existing]
 
         logger.info(f"Total entries to be fetched: {len(entries)}")
 
@@ -272,7 +266,6 @@ class NewsRepository:
             no_of_articles: int = self._commit_on_each_entries_preprocessor(
                 entries=entries,
                 pubsub=pubsub,
-                scrape_content=scrape_content,
                 classify=classify,
             )
             logger.info(f"{no_of_articles} new articles saved and notified.")
@@ -281,7 +274,6 @@ class NewsRepository:
             no_of_articles: int = self._bulk_commit_entries_preproocessor(
                 entries=entries,
                 pubsub=pubsub,
-                scrape_content=scrape_content,
                 classify=classify,
             )
             logger.info(f"{no_of_articles} new articles saved and notified.")
@@ -326,10 +318,10 @@ def init_repository() -> NewsRepository:
 if __name__ == "__main__":
     repository: NewsRepository = init_repository()
     total_articles: int = repository.fetch_classify_and_save_articles(
-        source="GOOGLE",
+        source="HACKERNOON",
         cutoff_hours=24,
         commit_on_each=True,
-        scrape_content=False,
+        scrape_content=True,
         classify=True,
     )
     logger.debug(f"{total_articles} articles are saved in the DB.")

@@ -15,6 +15,9 @@ class Config(BaseSettings):
     PINECONE_API_KEY: str
     PINECONE_HOST: str
 
+    JINA_BASE_URL: str 
+    JINA_API_KEY: str
+
 
     GROQ_API_KEY: str
 

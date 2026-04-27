@@ -1,4 +1,4 @@
-from src.core.news_service.types import CategoriesDataDict
+from src.core.news_service.custom_types import CategoriesDataDict
 
 
 INITIAL_CATEGORIES_DATA: CategoriesDataDict = {

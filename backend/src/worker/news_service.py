@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.core.news_service.types import ServiceArticle
+from src.core.news_service.custom_types import ServiceArticle
 from src.core.ai.models import ClassificationResponse
 from src.db.schemas import UserDefinedArticleClassification, Articles, SubCategory
 
@@ -20,11 +20,15 @@ class WorkerNewsService:
             session: Session,
         ) -> Articles:
             user_defined_classification = []
-
+            # Extra parameters will be stored as metadata
+            article_metadata = article.model_extra
             article_dict: dict = article.model_dump()
             classification_response: ClassificationResponse = article_dict.pop(
                 "classification"
             )
+            # Removing the metadata keys form dict.
+            for key in article_metadata.keys():
+                article_dict.pop(key)
 
             article_orm = Articles(
                 **article_dict,
@@ -58,10 +62,15 @@ class WorkerNewsService:
         classification_orms: List[List[UserDefinedArticleClassification]] = []
 
         for article in articles:
+            # Extra parameters will be stored as metadata
+            article_metadata = article.model_extra
             article_dict: dict = article.model_dump()
             classification_response: ClassificationResponse = article_dict.pop(
                 "classification"
             )
+            # Removing the metadata keys form dict.
+            for key in article_metadata.keys():
+                article_dict.pop(key)
 
             article_orm = Articles(
                 **article_dict,

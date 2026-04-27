@@ -1,15 +1,27 @@
 from abc import ABC, abstractmethod
 from src.core.ai.models import ClassificationResponse
-from typing import Dict
-from src.core.news_service.types import ServiceArticle
+from typing import Dict, Type
 from datetime import datetime, timezone
+from src.core.news_service.jina_webscraper import JinaScraper
+from src.core.news_service.custom_types import ServiceArticle
+from pydantic import BaseModel
 
 
 class InvalidScraper(Exception):
     pass
 
+
 class BaseNewsService(ABC):
     """Abstract base class for all news services (Anthropic, Google, OpenAI, etc.)"""
+
+    @property
+    @abstractmethod
+    def rss_urls(self) -> list[str]:
+        pass
+
+    @abstractmethod
+    def get_rss_entry_model(self):
+        pass
 
     @classmethod
     @abstractmethod
@@ -22,23 +34,23 @@ class BaseNewsService(ABC):
         """Return the news article source for this service"""
         pass
 
+    @abstractmethod
+    def fetch_rss_feed(self, cutoff_hours: int = 24) -> list[Dict]:
+        pass
+
+    @abstractmethod
+    def scrape_url(self, entry: Dict) -> str:
+        pass
+
+
+
     def to_service_article(
         self,
-        entry: Dict,
-        classified_category: ClassificationResponse,
-        markdown_content: str | None = None,
+        entry: Type[BaseModel],
+        classification: ClassificationResponse,
     ) -> ServiceArticle:
-        published_parsed = getattr(entry, "published_parsed", None)
-        published_time = datetime(*published_parsed[:6], tzinfo=timezone.utc)
         return ServiceArticle(
-            guid=entry.get("guid") or entry.get("id"),
-            title=entry.get("title"),
-            url=entry.get('link'),
-            description=entry.get("description"),
+            **entry.model_dump(),
             source=self.get_source(),
-            published_on=published_time,
-            classification=classified_category,
-            markdown_content=markdown_content if markdown_content is not None else None,
+            classification=classification
         )
-
-

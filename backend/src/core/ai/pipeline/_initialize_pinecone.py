@@ -11,6 +11,7 @@ from src.core.ai.models import (
     PrimaryCategoryRecord,
     TopicKeywordRecord,
 )
+from src.core.ai.components.pinecone_db import init_pinecone_db_async
 from src.services.ai_news_service import CategoriesDBService
 from src.db.dependencies import get_session
 from src.constants import (
@@ -94,7 +95,6 @@ class PineconeInitializerAsync:
         )
 
 
-
 async def run_init_pinecone_pipeline(pinecone_client: PineconeServiceAsync):
     category_service: CategoriesDBService = CategoriesDBService()
 
@@ -118,3 +118,10 @@ async def run_init_pinecone_pipeline(pinecone_client: PineconeServiceAsync):
     await initializer.main_pipeline()
 
 
+async def main():
+    pinecone_client: PineconeServiceAsync = await init_pinecone_db_async()
+    await run_init_pinecone_pipeline(pinecone_client)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

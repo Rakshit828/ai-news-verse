@@ -1,13 +1,11 @@
 import asyncio
-from src.services.ai_news_service import CategoriesDBService
+from src.core.ai.pipeline._initialize_pinecone import run_init_pinecone_pipeline
+from src.core.ai.components import init_pinecone_db_async
+
 
 async def main():
-    from src.db.dependencies import get_session
-
-    category_services = CategoriesDBService()
-    async for session in get_session():
-        await category_services._initialize_categories(session)
-        await category_services.get_categories_data(session)
+    pinecone = await init_pinecone_db_async()
+    run_init_pinecone_pipeline(pinecone_client=pinecone)
 
 
 if __name__ == "__main__":
