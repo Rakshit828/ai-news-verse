@@ -318,7 +318,7 @@ def init_repository() -> NewsRepository:
 if __name__ == "__main__":
     repository: NewsRepository = init_repository()
     total_articles: int = repository.fetch_classify_and_save_articles(
-        source="HACKERNOON",
+        source="ANTHROPIC",
         cutoff_hours=24,
         commit_on_each=True,
         scrape_content=True,
