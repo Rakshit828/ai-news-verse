@@ -18,8 +18,8 @@ from src.core.news_service.sources import (
     HackernoonService,
 )
 from src.core.ai.pipeline import VDBCategoryClassifierSync
-from src.services.notification_system import CeleryPublisher
-from src.models.ai_news_service import NewNewsNotification
+from src.core.notification_system import CeleryPublisher
+from src.domains.news.repository import NewNewsNotification
 
 
 class InvalidArgument(Exception):

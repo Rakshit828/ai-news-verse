@@ -13,8 +13,7 @@ config = context.config
 
 
 from src.db.main import Base
-from src.db.schemas.ai_news_service import *
-from src.db.schemas.core import *
+from src.db.schemas import *
 from src.config import CONFIG
 
 config.set_main_option('sqlalchemy.url', CONFIG.DATABASE_URL)

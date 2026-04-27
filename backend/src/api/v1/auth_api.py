@@ -4,16 +4,16 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from src.db.dependencies import get_session
 from src.config import CONFIG
-from src.services.auth import AuthService
-from src.auth.dependencies import RefreshTokenBearer
-from src.auth.utils import create_jwt_tokens
-from src.models.auth import (
+from src.domains.auth.repository import AuthService
+from src.domains.auth.dependencies import RefreshTokenBearer
+from src.domains.auth.utils import create_jwt_tokens
+from src.domains.auth.models import (
     UserCreateModel,
     UserResponseModel,
     UserLogInModel,
 )
 from src.response import AppError, SuccessResponse
-from src.auth.exceptions import InvalidTokenModelError
+from src.domains.auth.exceptions import InvalidTokenModelError
 
 
 def set_tokens_dev(response: Response, tokens_dict: dict[str, str]):
