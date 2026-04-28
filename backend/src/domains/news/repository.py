@@ -222,10 +222,7 @@ class NewsArticleRepository:
 
         subquery = select(
             Articles.title,
-            SubCategory.name.label("subcategory_name"),
             Articles.subcategory_id,
-            Category.name.label("category_name"),
-            Category.id.label("category_id"),
             func.row_number()
             .over(
                 partition_by=Articles.subcategory_id,
@@ -237,22 +234,26 @@ class NewsArticleRepository:
         stmt = (
             select(
                 subquery.c.title,
-                subquery.c.subcategory_name.label("subcategory"),
-                subquery.c.subcategory_id,
-                subquery.c.category_name.label("category"),
-                subquery.c.category_id,
+                subquery.c.subcategory_id.label("subcategory_id"),
+                SubCategory.name.label("subcategory"),
+                Category.name.label("category"),
+                Category.id.label("category_id"),
             )
             .select_from(subquery)
+            .join(
+                SubCategory,
+                subquery.c.subcategory_id == SubCategory.id,
+            )
+            .join(
+                Category,
+                SubCategory.category_id == Category.id,
+            )
             .where(subquery.c.row_num <= per_category)
         )
 
         result = await session.execute(stmt)
-        articles = [
-            NewsTitleWithCategoryIds(**row._mapping)
-            for row in result.all()
-        ]
+        articles = [NewsTitleWithCategoryIds(**row._mapping) for row in result.all()]
         return articles
-
 
     async def get_news(
         self,

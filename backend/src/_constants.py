@@ -1,5 +1,5 @@
 PINECONE_INDEX_NAME = "ai-news-system"
-NEWS_TITLES_CLASSIFICATION_NAMESPACE = "news-titles-classification"
+NEWS_TITLES_CLASSIFICATION_NAMESPACE = "news-titles-classification-data"
 
 SUBCATEGORY_ID_MAPPINGS = {
   "ai-industry": "4386aef4-d3ab-4171-ac43-5e8b4001fdcd",
