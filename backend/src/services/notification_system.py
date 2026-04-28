@@ -5,7 +5,7 @@ from src.db.redis import (
     RedisServiceClientSync,
 )
 from fastapi import WebSocket, WebSocketDisconnect
-from src.domains.news.repository import NewNewsNotification
+from src.domains.news.models import NewNewsNotification
 from loguru import logger
 from src.config import CONFIG
 

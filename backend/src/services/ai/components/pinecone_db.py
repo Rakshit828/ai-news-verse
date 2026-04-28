@@ -85,6 +85,7 @@ class PineconeServiceAsync:
         records: List[NewsTitleClassificationRecord],
         namespace: Optional[str] = NEWS_TITLES_CLASSIFICATION_NAMESPACE,
     ):
+        records: list[dict] = [record.model_dump() for record in records]
         try:
             logger.info(f"Upserting {len(records)} records to pinecone")
 

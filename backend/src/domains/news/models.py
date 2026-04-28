@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 class SubCategory(BaseModel):
@@ -30,13 +30,26 @@ class CategoriesDataResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-
-
 class SetUsersCategoryModel(BaseModel):
     """Represents the data sent by the users to set their categories."""
-    pass
+    categories: List[str]
 
 
 class UpdateUsersCategoryModel(BaseModel):
     """Represents the data sent by the users to update their categories."""
-    pass 
+    pass
+
+
+class NewNewsNotification(BaseModel):
+    """Represents a new article notification to be published to users."""
+    guid: str
+    title: str
+    link: str
+    description: Optional[str] = None
+    summary: Optional[str] = None
+    source: str
+    category_id: UUID
+    subcategory_id: UUID
+
+    model_config = ConfigDict(from_attributes=True)
+

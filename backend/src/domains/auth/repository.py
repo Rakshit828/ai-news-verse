@@ -23,7 +23,7 @@ class AuthService:
     async def get_user_by_uuid(self, user_uid: str, session: AsyncSession) -> Users | None:
         """Returns the user with the respective email"""
 
-        statement = select(Users).where(Users.uuid == user_uid)
+        statement = select(Users).where(Users.id == user_uid)
         result = await session.execute(statement)
         result = result.scalar_one_or_none()
         return result
@@ -83,7 +83,7 @@ class AuthService:
         if not is_verified:
             raise AppError(InvalidPasswordError())
 
-        uuid = user.uuid
+        uuid = user.id
         role = user.role
 
         tokens = await create_jwt_tokens(user_uuid=uuid, role=role, is_login=True)

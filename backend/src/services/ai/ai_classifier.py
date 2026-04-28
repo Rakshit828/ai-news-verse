@@ -26,6 +26,8 @@ def classify_news_topic_prompt(news_title: str, categories: list[str], news_desc
             - If the news title is nonsense or doesn't fit any known category, set "is_valid" to false.
             - Precision over Prose: Start directly with keywords. No filler like "This article is about...".
             - Return JSON only. No markdown formatting (no ```json).
+            - Give me the exact category as given. No cases changes. Just as it is given.
+
 
         ###INPUTS:
             NEWS_TITLE: "{news_title}"
@@ -74,7 +76,7 @@ class AiNewsClassifierAsync:
             logger.error("LLM is not able to produce JSON serializable response.")
             logger.error(f"LLM Response: {result}")
             raise exc
-
+        print("Raw AI Resosne : ", result)
         result = AiClassificationResponse(**response)
         logger.info(f"Title: {topic}, result: {result}")
         return result

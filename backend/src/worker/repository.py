@@ -19,7 +19,7 @@ from src.core.news_service.sources import (
 )
 from src.core.ai.pipeline import VDBCategoryClassifierSync
 from src.core.notification_system import CeleryPublisher
-from src.domains.news.repository import NewNewsNotification
+from src.domains.news.models import NewNewsNotification
 
 
 class InvalidArgument(Exception):

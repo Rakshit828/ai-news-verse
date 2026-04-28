@@ -16,6 +16,11 @@ from src.response import AppError, SuccessResponse
 from src.domains.auth.exceptions import InvalidTokenModelError
 
 
+# Token expiry configuration
+REFRESH_TOKEN_EXPIRY_SECONDS = CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60
+ACCESS_TOKEN_EXPIRY_SECONDS = CONFIG.ACCESS_TOKEN_EXPIRY_MINUTES * 60
+
+
 def set_tokens_dev(response: Response, tokens_dict: dict[str, str]):
     token_keys: set[str] = { "access_token", "refresh_token" }
     if not tokens_dict.keys():
@@ -32,6 +37,7 @@ def set_tokens_dev(response: Response, tokens_dict: dict[str, str]):
             samesite='lax',
             max_age=REFRESH_TOKEN_EXPIRY_SECONDS if key == "refresh_token" else ACCESS_TOKEN_EXPIRY_SECONDS
         )
+
 
 def set_tokens_production(response: Response, tokens_dict: dict[str, str]):
     token_keys: set[str] = { "access_token", "refresh_token" }
@@ -50,12 +56,9 @@ def set_tokens_production(response: Response, tokens_dict: dict[str, str]):
             max_age=REFRESH_TOKEN_EXPIRY_SECONDS if key == "refresh_token" else ACCESS_TOKEN_EXPIRY_SECONDS
         )
 
-REFRESH_TOKEN_EXPIRY_SECONDS = CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60
-ACCESS_TOKEN_EXPIRY_SECONDS = CONFIG.ACCESS_TOKEN_EXPIRY_MINUTES * 60
 
 auth_routes = APIRouter()
 auth_service = AuthService()
-
 
 
 @auth_routes.post(
@@ -68,10 +71,11 @@ async def create_account(
     session: AsyncSession = Depends(get_session),
 ) -> SuccessResponse[UserResponseModel]:
     user = await auth_service.make_account(user_data=user_data, session=session)
+    user_response = UserResponseModel.model_validate(user)
     return SuccessResponse[UserResponseModel](
         status_code=status.HTTP_201_CREATED,
         message="Account Created Successfully",
-        data=user.__dict__,
+        data=user_response,
     )
 
 
@@ -87,10 +91,11 @@ async def login(
     else:
         set_tokens_production(response=response, tokens_dict=tokens)
     user = await auth_service.get_user_by_email(email=user_data.email, session=session)
+    user_response = UserResponseModel.model_validate(user)
     return SuccessResponse[UserResponseModel](
         message="Logged In Successfully.",
         status_code=status.HTTP_200_OK,
-        data=user.__dict__
+        data=user_response
     )
 
 
