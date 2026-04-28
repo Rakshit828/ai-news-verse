@@ -46,7 +46,7 @@ class NewsCategoryRepository:
 
     async def get_categories_data(
         self, session: AsyncSession
-    ) -> CategoriesDataResponse:
+    ) -> CategoriesDataResponse | None:
         """Returs the full category and subcategory data from the table except custom ones."""
         statement = select(Category).options(
             joinedload(Category.subcategories),
@@ -54,7 +54,8 @@ class NewsCategoryRepository:
         logger.info(f"[SQL] {statement}")
         result = await session.execute(statement)
         categories: List[Category] = result.unique().scalars().all()
-        return CategoriesDataResponse(categories=categories)
+        return CategoriesDataResponse(categories=categories) if categories else None
+    
 
     async def get_categories_data_of_user(
         self, user_id: str, session: AsyncSession

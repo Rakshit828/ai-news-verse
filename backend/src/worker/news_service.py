@@ -1,11 +1,10 @@
 from typing import List
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, insert
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from loguru import logger
 
 from src.services.news_service.types import ServiceArticle
-from src.services.ai.models import ClassificationResponse
 from src.db.schemas import Articles, SubCategory
 
 

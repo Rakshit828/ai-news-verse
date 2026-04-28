@@ -1,6 +1,5 @@
-from typing import List, Tuple, Literal, Union
+from typing import List, Literal
 from loguru import logger
-import uuid
 
 from src.db.schemas import Articles
 from src.worker.db import GetLocalSession
@@ -11,16 +10,16 @@ from src.services.news_service.types import (
     ScrapedData,
     GoogleScrapedData,
 )
-from src.services.ai.models import ClassificationResponse
 from src.services.news_service.sources import (
     OpenAiService,
     AnthropicService,
     GoogleService,
     HackernoonService,
 )
+from src.services.ai.models import VDBClassificationResponse
 from src.services.ai.news_title_classification import VDBCategoryClassifierSync
 from src.services.notification_system import CeleryPublisher
-from src.domains.news.models import NewNewsNotification, SubCategory
+from src.domains.news.models import NewNewsNotification
 
 
 class InvalidArgument(Exception):
@@ -126,7 +125,7 @@ class NewsRepository:
         if scrape_content:
             entry: ScrapedData = self.current_service.scrape_url(scraped_entry=entry)
         if classify:
-            classification: ClassificationResponse = self.classifier.run(
+            classification: VDBClassificationResponse = self.classifier.run(
                 title=entry.title
             )
 

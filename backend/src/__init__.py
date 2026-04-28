@@ -12,6 +12,7 @@ from src.api.v1.news_service_api import news_routes
 from src.api.v1.monitoring_api import monitoring_routes
 from src.services.ai.components import PineconeServiceAsync, init_pinecone_db_async
 from src.scripts._initialize_pinecone import run_init_pinecone_pipeline
+from src.scripts._initialize_categories import _initialize_categories
 from src.domains.news.repository import NewsCategoryRepository
 from src.db.dependencies import get_session
 
@@ -26,9 +27,8 @@ origins = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async for session in get_session():
-        logger.debug("Starting to Initialize categories.")
-        category_repo = NewsCategoryRepository()
-        await category_repo.get_categories_data(session=session)
+        await _initialize_categories(session, category_repo=NewsCategoryRepository())
+
     pinecone_client: PineconeServiceAsync = await init_pinecone_db_async()
 
     data_exists = await pinecone_client.does_namespaces_exist()
