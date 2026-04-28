@@ -1,12 +1,27 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
+from datetime import datetime
+from src.db.schemas import Source
+
+
 
 class SubCategory(BaseModel):
     subcategory_id: UUID = Field(alias="id")
     name: str
 
     model_config = ConfigDict(from_attributes=True)
+
+class NewsResponse(BaseModel):
+    id: str
+    title: str
+    url: str
+    source: Source
+    summary: Optional[str]
+    published_on: datetime
+    metadatas: Optional[Dict]
+    featured_image: Optional[str]
+    subcategory: SubCategory
 
 
 class Category(BaseModel):
@@ -35,21 +50,17 @@ class SetUsersCategoryModel(BaseModel):
     categories: List[str]
 
 
-class UpdateUsersCategoryModel(BaseModel):
-    """Represents the data sent by the users to update their categories."""
-    pass
-
-
 class NewNewsNotification(BaseModel):
     """Represents a new article notification to be published to users."""
-    guid: str
+    id: str
     title: str
-    link: str
-    description: Optional[str] = None
-    summary: Optional[str] = None
-    source: str
-    category_id: UUID
-    subcategory_id: UUID
+    url: str
+    source: Source
+    summary: Optional[str]
+    published_on: datetime
+    metadatas: Optional[Dict]
+    featured_image: Optional[str]
+    subcategory_id: str 
 
     model_config = ConfigDict(from_attributes=True)
 

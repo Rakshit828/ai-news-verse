@@ -1,25 +1,26 @@
 from typing import List, Tuple, Literal, Union
 from loguru import logger
+import uuid
 
-from src.db.schemas.ai_news_service import Articles
+from src.db.schemas import Articles
 from src.worker.db import GetLocalSession
 from sqlalchemy.orm import Session
 from src.worker.news_service import WorkerNewsService
-from src.core.news_service.custom_types import (
+from src.services.news_service.types import (
     ServiceArticle,
     ScrapedData,
     GoogleScrapedData,
 )
-from src.core.ai.models import ClassificationResponse
-from src.core.news_service.sources import (
+from src.services.ai.models import ClassificationResponse
+from src.services.news_service.sources import (
     OpenAiService,
     AnthropicService,
     GoogleService,
     HackernoonService,
 )
-from src.core.ai.pipeline import VDBCategoryClassifierSync
-from src.core.notification_system import CeleryPublisher
-from src.domains.news.models import NewNewsNotification
+from src.services.ai.news_title_classification import VDBCategoryClassifierSync
+from src.services.notification_system import CeleryPublisher
+from src.domains.news.models import NewNewsNotification, SubCategory
 
 
 class InvalidArgument(Exception):
@@ -51,39 +52,22 @@ def prepare_messages_for_publishing(
     articles: List[ServiceArticle],
 ) -> List[NewNewsNotification]:
     news: List[NewNewsNotification] = list()
-    for article in articles:
-        classification = article.classification
-        if len(classification["user_defined"]) == 0:
-            classification["user_defined"] = []
+    news_articles = [
+        NewNewsNotification(
+            id=article.guid,
+            title=article.title,
+            url=article.url,
+            source=article.source,
+            summary=article.summary,
+            published_on=article.published_on,
+            featured_image=article.featured_image,
+            subcategory_id=article.classification.subcategory_id,
+            metadatas=article.model_extra,
+        )
+        for article in articles
+    ]
 
-        news.extend(
-            [
-                NewNewsNotification(
-                    guid=article.guid,
-                    title=article.title,
-                    link=article.url,
-                    description=article.description,
-                    summary=article.summary,
-                    source=article.source,
-                    category_id=user_defined_cat["category_id"],
-                    subcategory_id=user_defined_cat["subcategory_id"],
-                )
-                for user_defined_cat in classification["user_defined"]
-            ]
-        )
-        news.append(
-            NewNewsNotification(
-                guid=article.guid,
-                title=article.title,
-                link=article.url,
-                description=article.description,
-                summary=article.summary,
-                source=article.source,
-                category_id=classification["app_defined"]["category_id"],
-                subcategory_id=classification["app_defined"]["subcategory_id"],
-            )
-        )
-    return news
+    return news_articles
 
 
 class NewsRepository:
@@ -159,29 +143,46 @@ class NewsRepository:
         scrape_content: bool = True,
         classify: bool = True,
     ) -> int:
+        """Process entries one by one, saving each immediately.
+
+        Args:
+            entries: List of scraped entries
+            pubsub: CeleryPublisher for notifications
+            scrape_content: Whether to scrape full content
+            classify: Whether to classify articles
+
+        Returns:
+            Number of articles successfully saved
+        """
         no_of_articles = 0
         for entry in entries:
-            service_article: ServiceArticle = self.scrape_url_and_classify(
-                entry=entry,
-                scrape_content=scrape_content,
-                classify=classify,
-            )
-            logger.info(f"Article processed: {service_article.title}")
-
-            if service_article is not None:
-                with GetLocalSession() as session:
-                    article: Articles = self.db.create_article(
-                        article=service_article, session=session
-                    )
-                    logger.info(f"Article saved: {article.title}, GUID: {article.guid}")
-
-                # Publishing to redis.
-                news_messages: List[NewNewsNotification] = (
-                    prepare_messages_for_publishing(articles=[service_article])
+            try:
+                service_article: ServiceArticle = self.scrape_url_and_classify(
+                    entry=entry,
+                    scrape_content=scrape_content,
+                    classify=classify,
                 )
-                pubsub.publish(news_messages)
+                logger.info(f"Article processed: {service_article.title}")
 
-            no_of_articles = no_of_articles + 1
+                if service_article is not None:
+                    with GetLocalSession() as session:
+                        article: Articles = self.db.create_article(
+                            article=service_article, session=session
+                        )
+                        logger.info(
+                            f"Article saved: {article.title}, GUID: {article.id}"
+                        )
+
+                    # Publishing to redis.
+                    news_messages: List[NewNewsNotification] = (
+                        prepare_messages_for_publishing(articles=[service_article])
+                    )
+                    pubsub.publish(news_messages)
+                    no_of_articles += 1
+            except Exception as e:
+                logger.error(f"Error processing entry {entry.id}: {str(e)}")
+                continue
+
         return no_of_articles
 
     def _bulk_commit_entries_preproocessor(
@@ -191,30 +192,47 @@ class NewsRepository:
         scrape_content: bool = True,
         classify: bool = True,
     ) -> int:
+        """Process all entries, then save in bulk for efficiency.
+
+        Args:
+            entries: List of scraped entries
+            pubsub: CeleryPublisher for notifications
+            scrape_content: Whether to scrape full content
+            classify: Whether to classify articles
+
+        Returns:
+            Number of articles successfully saved
+        """
         classified_articles: List[ServiceArticle] = []
         for entry in entries:
-            service_article: ServiceArticle = self.scrape_url_and_classify(
-                entry=entry,
-                scrape_content=scrape_content,
-                classify=classify,
-            )
+            try:
+                service_article: ServiceArticle = self.scrape_url_and_classify(
+                    entry=entry,
+                    scrape_content=scrape_content,
+                    classify=classify,
+                )
 
-            logger.info(f"Article processed: {service_article.title}")
+                logger.info(f"Article processed: {service_article.title}")
 
-            if service_article is not None:
-                classified_articles.append(service_article)
+                if service_article is not None:
+                    classified_articles.append(service_article)
+            except Exception as e:
+                logger.error(f"Error processing entry {entry.id}: {str(e)}")
+                continue
 
         if classified_articles:
             with GetLocalSession() as session:
-                self.db.bulk_create_articles(classified_articles, session)
+                no_saved = self.db.bulk_create_articles(classified_articles, session)
+        else:
+            no_saved = 0
 
-        news_messages: list[NewNewsNotification] = prepare_messages_for_publishing(
-            articles=classified_articles
-        )
+        if classified_articles:
+            news_messages: list[NewNewsNotification] = prepare_messages_for_publishing(
+                articles=classified_articles
+            )
+            pubsub.publish(news_messages)
 
-        pubsub.publish(news_messages)
-
-        return len(classified_articles)
+        return no_saved
 
     def fetch_classify_and_save_articles(
         self,
@@ -225,58 +243,77 @@ class NewsRepository:
         scrape_content: bool = True,
         classify: bool = True,
     ) -> int:
-        """Main workflow: fetch, classify, and save articles"""
+        """Main workflow: fetch, classify, and save articles.
+
+        Args:
+            source: News source
+            pubsub: CeleryPublisher for notifications (auto-created if None)
+            cutoff_hours: Hours to look back for existing articles
+            commit_on_each: Commit each article individually (True) or bulk commit (False)
+            scrape_content: Whether to scrape full article content
+            classify: Whether to classify articles
+
+        Returns:
+            Number of articles processed and saved
+        """
         self.current_service = self._get_current_service(source=source)
 
         if pubsub is None:
             pubsub = CeleryPublisher()
 
-        entries: ScrapedData = self.current_service.fetch_rss_feed(
+        entries: list[ScrapedData] = self.current_service.fetch_rss_feed(
             cutoff_hours=cutoff_hours
         )
 
         if not entries:
+            logger.info(f"No entries fetched from {source}")
             return 0
 
+        # For Google, remove duplicates based on title
         if source == "GOOGLE":
-            unique_entries: list[dict] = check_for_unique_titles(entries)
+            unique_entries: list[GoogleScrapedData] = check_for_unique_titles(entries)
             entries = unique_entries
 
         all_guids = {entry.id for entry in entries}
+        logger.debug(f"{len(all_guids)} entries scraped from {source}")
 
-        logger.debug(f"{len(all_guids)} are scraped.")
-
+        # Get existing GUIDs to avoid duplicates
         with GetLocalSession() as session:
-            all_exising_guids = self.db.get_all_guids(
+            all_existing_guids = self.db.get_all_guids(
                 session=session,
                 source=self.current_service.get_source(),
                 cutoff_hours=cutoff_hours,
             )
 
-        already_existing = set(all_exising_guids).intersection(all_guids)
+        already_existing = set(all_existing_guids).intersection(all_guids)
+        logger.debug(f"{len(already_existing)} entries already existed in DB")
 
-        logger.debug(f"{len(already_existing)} entires already existed.")
-
-        # This creates all the valid guids to be stored in the db
+        # Filter out existing entries
         entries = [entry for entry in entries if entry.id not in already_existing]
+        logger.info(f"Total new entries to process: {len(entries)}")
 
-        logger.info(f"Total entries to be fetched: {len(entries)}")
+        if not entries:
+            logger.info(f"No new entries to process from {source}")
+            return 0
 
-        if commit_on_each is True:
+        # Process entries based on commit strategy
+        if commit_on_each:
             no_of_articles: int = self._commit_on_each_entries_preprocessor(
                 entries=entries,
                 pubsub=pubsub,
+                scrape_content=scrape_content,
                 classify=classify,
             )
-            logger.info(f"{no_of_articles} new articles saved and notified.")
-
         else:
             no_of_articles: int = self._bulk_commit_entries_preproocessor(
                 entries=entries,
                 pubsub=pubsub,
+                scrape_content=scrape_content,
                 classify=classify,
             )
-            logger.info(f"{no_of_articles} new articles saved and notified.")
+
+        logger.info(f"{no_of_articles} new articles processed and saved from {source}")
+        return no_of_articles
 
 
 def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:

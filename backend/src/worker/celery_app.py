@@ -1,5 +1,5 @@
 from celery import Celery
-from celery.schedules import crontab, schedule
+from celery.schedules import crontab
 from src.config import CONFIG
 
 app = Celery(
@@ -20,28 +20,28 @@ app.conf.update(
 )
 
 
-NEWS_REFETCH_MINUTE = 5
+NEWS_REFETCH_INTERVAL_SECONDS = 5 * 60  # 5 minutes
 
 
 CELERY_BEAT_SCHEDULE = {
     "fetch_classify_notify_openai": {
         "task": "src.worker.tasks.fetch_classify_notify",
-        "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
+        "schedule": NEWS_REFETCH_INTERVAL_SECONDS,
         "args": ("OPENAI",),
     },
     "fetch_classify_notify_anthropic": {
         "task": "src.worker.tasks.fetch_classify_notify",
-        "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
+        "schedule": NEWS_REFETCH_INTERVAL_SECONDS,
         "args": ("ANTHROPIC",),
     },
     "fetch_classify_notify_hackernoon": {
         "task": "src.worker.tasks.fetch_classify_notify",
-        "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
+        "schedule": NEWS_REFETCH_INTERVAL_SECONDS,
         "args": ("HACKERNOON",),
     },
     "fetch_classify_notify_google": {
         "task": "src.worker.tasks.fetch_classify_notify",
-        "schedule": schedule(run_every=NEWS_REFETCH_MINUTE * 60),
+        "schedule": NEWS_REFETCH_INTERVAL_SECONDS,
         "args": ("GOOGLE",),
     },
 }

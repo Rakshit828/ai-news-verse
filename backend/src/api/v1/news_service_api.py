@@ -1,23 +1,13 @@
-import asyncio
-from fastapi import (
-    APIRouter,
-    Depends,
-    status,
-    Request,
-    WebSocket,
-    WebSocketDisconnect,
-    WebSocketException,
-)
+from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.ext.asyncio.session import AsyncSession
-from typing import Union
 
 from src.domains.auth.dependencies import AccessTokenBearer, AccessTokenBearerForWS
-from src.domains.news.models import SetUsersCategoryModel, UpdateUsersCategoryModel
-from src.domains.news.models import CategoriesDataResponse, SetUsersCategoryModel
-
-# from src.domains.news.repository import Newsre
+from src.domains.news.models import (
+    SetUsersCategoryModel,
+    CategoriesDataResponse,
+    NewsResponse,
+)
 from src.domains.news.repository import NewsArticleRepository, NewsCategoryRepository
-from src.services.ai.components.pinecone_db import PineconeServiceAsync
 from src.utils import safely_run_controllers
 from src.services.notification_system import PubSubSystem, get_pubsub_system
 from src.db.dependencies import get_session
@@ -29,40 +19,33 @@ from loguru import logger
 news_routes = APIRouter()
 
 
-# @news_routes.websocket("/ws/livenews")
-# async def websocket_endpoint(
-#     websocket: WebSocket,
-#     token_data=Depends(AccessTokenBearerForWS()),
-#     pubsub: PubSubSystem = Depends(get_pubsub_system)
-# ):
-#     user_id = token_data["sub"]
-#     logger.debug(f"Client {user_id} is trying to connect.")
-#     await websocket.accept()
-#     logger.info(f"Client with id: {user_id} connected successfully.")
+@news_routes.websocket("/ws/livenews")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token_data=Depends(AccessTokenBearerForWS()),
+    category_repo: NewsCategoryRepository = Depends(NewsCategoryRepository),
+    pubsub: PubSubSystem = Depends(get_pubsub_system)
+):
+    user_id = token_data["sub"]
+    logger.debug(f"Client {user_id} is trying to connect.")
+    await websocket.accept()
+    logger.info(f"Client with id: {user_id} connected successfully.")
 
-#     async with Session() as session:
-#         categories_data: CategoriesDataResponse = await safely_run_controllers(
-#             func=
-# category_repo.get_user_categories, user_id=user_id, session=session
-#         )
+    async with Session() as session:
+        subcategory_ids: list[str] = await safely_run_controllers(
+            func=category_repo.get_user_subcategories_id, user_id=user_id, session=session
+        )
 
-#     # Channels is a list of the user subcategories ids.
-#     channels: list[str] = [
-#         str(subcategory.subcategory_id)
-#         for category in categories_data.categories_data
-#         for subcategory in category.subcategories
-#     ]
+    try:
+        await pubsub.listen_multiple(channels=subcategory_ids, websocket=websocket)
+    except WebSocketDisconnect:
+        logger.info(f"Client with user_id: {user_id} disconnected.")
 
-#     try:
-#         await pubsub.listen_multiple(channels=channels, websocket=websocket)
-#     except WebSocketDisconnect:
-#         logger.info(f"Client with user_id: {user_id} disconnected.")
-
-#     except Exception as e:
-#         logger.error(str(e))
-#     finally:
-#         if not websocket.client_state.name == "DISCONNECTED":
-#             await websocket.close()
+    except Exception as e:
+        logger.error(str(e))
+    finally:
+        if not websocket.client_state.name == "DISCONNECTED":
+            await websocket.close()
 
 
 @news_routes.get(
@@ -109,28 +92,31 @@ async def set_user_categories(
     )
 
 
-# @news_routes.put(
-#     "/category",
-#     response_model=SuccessResponse[CategoriesDataResponse],
-# )
-# async def update_user_categories(
-#     categories_data: UpdateUsersCategoriesModel,
-#     decoded_token=Depends(AccessTokenBearer()),
-#     session: AsyncSession = Depends(get_session),
-# ) -> SuccessResponse[CategoriesDataResponse]:
-#     user_id = decoded_token["sub"]
-#     result: CategoriesDataResponse = await safely_run_controllers(
-#
-# category_repo.update_user_categories,
-#         session=session,
-#         user_id=user_id,
-#         categories_data=categories_data,
-#     )
-#     return SuccessResponse[CategoriesDataResponse](
-#         status_code=status.HTTP_201_CREATED,
-#         message="Categories Set Successfully.",
-#         data=CategoriesDataResponse(categories_data=result.categories_data),
-#     )
+@news_routes.put(
+    "/category",
+    response_model=SuccessResponse[CategoriesDataResponse],
+)
+async def update_user_categories(
+    categories_data: SetUsersCategoryModel,
+    decoded_token=Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_session),
+    category_repo: NewsCategoryRepository = Depends(NewsCategoryRepository),
+) -> SuccessResponse[CategoriesDataResponse]:
+    user_id = decoded_token["sub"]
+    await safely_run_controllers(
+        category_repo.set_user_categories,
+        session=session,
+        user_id=user_id,
+        categories_data=categories_data,
+    )
+    updated_categories: CategoriesDataResponse = await safely_run_controllers(
+        category_repo.get_categories_data_of_user, user_id=user_id, session=session
+    )
+    return SuccessResponse[CategoriesDataResponse](
+        status_code=status.HTTP_200_OK,
+        message="Categories Updated Successfully.",
+        data=updated_categories,
+    )
 
 
 @news_routes.get(
@@ -177,17 +163,33 @@ async def delete_custom_category(
     )
 
 
-# @news_routes.get("/today", response_model=SuccessResponse[TodayNewsResponse])
-# async def get_latest_news(
-#     decoded_token=Depends(AccessTokenBearer()),
-#     session: AsyncSession = Depends(get_session),
-# ):
-#     user_id = decoded_token["sub"]
-#     today_news_response = await safely_run_controllers(
-#         news_service.get_today_news, session=session, user_id=user_id
-#     )
-#     return SuccessResponse[TodayNewsResponse](
-#         status_code=status.HTTP_200_OK,
-#         message="Returned News Successfully",
-#         data=today_news_response,
-#     )
+@news_routes.get("/today", response_model=SuccessResponse[NewsResponse])
+async def get_latest_news(
+    cutoff: int,
+    subcats: list[str] | None = Query(None),
+    sources: list[str] | None = Query(None),
+    decoded_token=Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_session),
+    category_repo: NewsCategoryRepository = Depends(NewsCategoryRepository),
+    article_repo: NewsArticleRepository = Depends(NewsArticleRepository),
+):
+    user_id = decoded_token["sub"]
+    if subcats is None:
+        subcats = await category_repo.get_user_subcategories_id(
+            user_id=user_id, session=session
+        )
+        if subcats is None:
+            raise Exception("Please define subcategories.")
+
+    today_news_response: list[NewsResponse] | None = await safely_run_controllers(
+        article_repo.get_news,
+        session=session,
+        cutoff_hours=cutoff,
+        sources=sources,
+        subcategory_ids=subcats,
+    )
+    return SuccessResponse[list[NewsResponse] | None](
+        status_code=status.HTTP_200_OK,
+        message="Returned News Successfully",
+        data=today_news_response,
+    )

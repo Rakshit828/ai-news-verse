@@ -1,9 +1,18 @@
 from typing import Awaitable
 from src.response import AppError
-from src.exceptions import UnexpectedErrorInController
 from loguru import logger
 import time
 from functools import wraps
+from fastapi import status
+
+from src.response import ErrorResponse, T
+
+
+class UnexpectedErrorInController(ErrorResponse[T]):
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
+    message: str = "Something went wrong."
+    error: str = "unexpected_error_in_controller"
+    data: T | None = None
 
 def timeit(func):
     @wraps(func)

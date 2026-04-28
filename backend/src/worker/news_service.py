@@ -1,124 +1,140 @@
 from typing import List
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select
+from sqlalchemy import select, insert
 from sqlalchemy.orm import Session
+from loguru import logger
 
-from src.core.news_service.custom_types import ServiceArticle
-from src.core.ai.models import ClassificationResponse
-from src.db.schemas import UserDefinedArticleClassification, Articles, SubCategory
+from src.services.news_service.types import ServiceArticle
+from src.services.ai.models import ClassificationResponse
+from src.db.schemas import Articles, SubCategory
 
 
 class WorkerNewsService:
+    """Synchronous database service for worker operations."""
+
     def get_subcategories_titles(self, session: Session) -> list[str]:
-        stmt = select(SubCategory.title)
-        result: list[str] = (session.execute(statement=stmt)).scalars().all()
+        """Get all subcategory names from database."""
+        stmt = select(SubCategory.name)
+        result: list[str] = session.execute(stmt).scalars().all()
         return result
-    
+
     def create_article(
-            self,
-            article: ServiceArticle,
-            session: Session,
-        ) -> Articles:
-            user_defined_classification = []
-            # Extra parameters will be stored as metadata
-            article_metadata = article.model_extra
-            article_dict: dict = article.model_dump()
-            classification_response: ClassificationResponse = article_dict.pop(
-                "classification"
-            )
-            # Removing the metadata keys form dict.
-            for key in article_metadata.keys():
-                article_dict.pop(key)
+        self,
+        article: ServiceArticle,
+        session: Session,
+    ) -> Articles:
+        """Create a single article in the database.
 
-            article_orm = Articles(
-                **article_dict,
-                category_id=classification_response["app_defined"]["category_id"],
-                subcategory_id=classification_response["app_defined"]["subcategory_id"],
-            )
-            if classification_response["user_defined"] is not None:
-                user_defined_classification: list[UserDefinedArticleClassification] = [
-                    UserDefinedArticleClassification(
-                        article_id=article.guid,
-                        subcategory_id=classification["subcategory_id"],
-                    )
-                    for classification in classification_response["user_defined"]
-                ]
+        Args:
+            article: ServiceArticle object with article data
+            session: SQLAlchemy session
 
-            
-            session.add(article_orm)
-            if len(user_defined_classification) != 0:
-                session.add_all(user_defined_classification)
-            
+        Returns:
+            Articles ORM object
+        """
+        try:
+            db_article = Articles(
+                id=article.guid,
+                title=article.title,
+                description=article.description,
+                url=article.url,
+                source=article.source,
+                published_on=article.published_on,
+                markdown_content=article.markdown_content,
+                summary=article.summary,
+                featured_image=article.featured_image,
+                subcategory_id=article.classification.subcategory_id,
+                metadatas=article.model_extra,
+            )
+            session.add(db_article)
             session.commit()
-            return article_orm
-
+            logger.debug(f"Article created: {db_article.id} - {db_article.title}")
+            return db_article
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error creating article: {str(e)}")
+            raise
 
     def bulk_create_articles(
         self,
         articles: List[ServiceArticle],
         session: Session,
-    ):
-        article_orms: List[Articles] = []
-        classification_orms: List[List[UserDefinedArticleClassification]] = []
+    ) -> int:
+        """Create multiple articles in the database efficiently.
 
-        for article in articles:
-            # Extra parameters will be stored as metadata
-            article_metadata = article.model_extra
-            article_dict: dict = article.model_dump()
-            classification_response: ClassificationResponse = article_dict.pop(
-                "classification"
-            )
-            # Removing the metadata keys form dict.
-            for key in article_metadata.keys():
-                article_dict.pop(key)
+        Args:
+            articles: List of ServiceArticle objects
+            session: SQLAlchemy session
 
-            article_orm = Articles(
-                **article_dict,
-                category_id=classification_response["app_defined"]["category_id"],
-                subcategory_id=classification_response["app_defined"]["subcategory_id"],
-            )
+        Returns:
+            Number of articles created
+        """
+        if not articles:
+            return 0
 
-            article_orms.append(article_orm)
+        try:
+            db_articles = [
+                Articles(
+                    id=article.guid,
+                    title=article.title,
+                    description=article.description,
+                    url=article.url,
+                    source=article.source,
+                    published_on=article.published_on,
+                    markdown_content=article.markdown_content,
+                    summary=article.summary,
+                    featured_image=article.featured_image,
+                    article_metadata=article.article_metadata,
+                    subcategory_id=article.classification.subcategory_id,
+                    metadatas=article.metadatas,
+                )
+                for article in articles
+            ]
+            session.bulk_save_objects(db_articles)
+            session.commit()
+            logger.debug(f"Bulk created {len(db_articles)} articles")
+            return len(db_articles)
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error bulk creating articles: {str(e)}")
+            raise
 
-            if classification_response["user_defined"] is not None:
-                user_defined_classification: list[UserDefinedArticleClassification] = [
-                    UserDefinedArticleClassification(
-                        article_id=article.get("guid", ""),
-                        subcategory_id=classification["subcategory_id"],
-                    )
-                    for classification in classification_response["user_defined"]
-                ]
-                classification_orms.append(user_defined_classification)
+    def check_guid(self, id: str, source: str, session: Session):
+        """Check the existence of article by id and source.
 
-        
-        session.add_all(article_orms)
-        if len(classification_orms) != 0:
-            for classification_orm in classification_orms:
-                session.add_all(classification_orm)
-        session.commit()
-        
-        return
+        Args:
+            id: Article ID (guid)
+            source: Article source
+            session: SQLAlchemy session
 
-    def check_guid(self, guid: str, source: str, session: Session):
-        """Check the existence of guid of articles object."""
-        statement = select(Articles).where(
-            Articles.guid == guid and Articles.source == source
-        )
+        Returns:
+            Articles object if exists, None otherwise
+        """
+        statement = select(Articles).where(Articles.id == id, Articles.source == source)
         result = session.execute(statement)
         return result.scalar_one_or_none()
 
     def get_all_guids(
         self, source: str, session: Session, cutoff_hours: int | None = 24
     ) -> list[str]:
-        """Returns all the guids associated with the category on the given cutoff hours. It returns all the guids if cutoff hour is None."""
+        """Get all article IDs for a source, optionally filtered by time.
+
+        Args:
+            source: Article source
+            session: SQLAlchemy session
+            cutoff_hours: Hours to look back (None = all articles)
+
+        Returns:
+            List of article IDs
+        """
         if cutoff_hours is None:
-            statement = select(Articles.guid).where(Articles.source == source)
+            statement = select(Articles.id).where(Articles.source == source)
         else:
             now = datetime.now(timezone.utc)
             cutoff_time = now - timedelta(hours=cutoff_hours)
-            statement = select(Articles.guid).where(
+            statement = select(Articles.id).where(
                 Articles.source == source, Articles.published_on >= cutoff_time
             )
-        
+
         result = session.execute(statement)
         return result.scalars().all()

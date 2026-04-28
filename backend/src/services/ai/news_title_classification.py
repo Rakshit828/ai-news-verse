@@ -7,7 +7,7 @@ from src.services.ai.components import (
     init_pinecone_db_sync,
 )
 
-from src.services.ai.models import VDBClassificationResponse, NewsTitleClassificationRecord
+from src.services.ai.models import VDBClassificationResponse, RelevantNewsTitlesResponse
 from src.services._constants import (
     PINECONE_APPLICATION_CATEGORY_NAMESPACE,
     PINECONE_USER_CATEGORY_NAMESPACE,
@@ -26,42 +26,25 @@ class VDBCategoryClassifierSync:
     def close_pc_connection(self) -> None:
         self._pinecone.close()
 
-    def run(self, title: str) -> VDBClassificationResponse:
-        response = {
-            "app_defined": dict(),
-            "user_defined": list(),
-        }
-
-        app_records: list[NewsTitleClassificationRecord] = (
-            self._pinecone.get_relevant_title_records(
-                namespace=PINECONE_APPLICATION_CATEGORY_NAMESPACE, title=title, k=1
-            )
-        )
-        user_records: list[NewsTitleClassificationRecord] = (
-            self._pinecone.get_relevant_title_records(
-                namespace=PINECONE_USER_CATEGORY_NAMESPACE, title=title, k=4
-            )
+    def run(
+        self, title: str, score_threshold: float = 0.3
+    ) -> VDBClassificationResponse:
+        related_titles: list[RelevantNewsTitlesResponse] = (
+            self._pinecone.get_relevant_news_titles(title=title, k=11)
         )
 
-        app_record_score = app_records[0]["_score"]
+        subcat_freq = {}
+        for record in related_titles:
+            if not record._score >= score_threshold:
+                continue
+            if record.fields.subcategory_id in subcat_freq:
+                subcat_freq[record.fields.subcategory_id] += 1
+            else:
+                subcat_freq[record.fields.subcategory_id] = 1
 
-        response["app_defined"] = {
-            "category_id": app_records[0]["fields"]["category_id"],
-            "subcategory_id": app_records[0]["fields"]["subcategory_id"],
-        }
-        response["user_defined"] = [
-            {
-                "category_id": record["fields"]["category_id"],
-                "subcategory_id": record["fields"]["subcategory_id"],
-            }
-            for record in user_records
-            if record["_score"] > app_record_score
-        ]
-
-        if len(response) == 0:
-            response["user_defined"] = None
-
-        return response
+        return VDBClassificationResponse(
+            category_id=None, subcategory_id=max(subcat_freq, key=subcat_freq.get)
+        )
 
 
 class VDBCategoryClassifierAsync:
@@ -82,12 +65,12 @@ class VDBCategoryClassifierAsync:
             "user_defined": list(),
         }
 
-        app_records: list[NewsTitleClassificationRecord] = (
+        app_records: list[RelevantNewsTitlesResponse] = (
             await self._pinecone.get_relevant_title_records(
                 namespace=PINECONE_APPLICATION_CATEGORY_NAMESPACE, title=title, k=1
             )
         )
-        user_records: list[NewsTitleClassificationRecord] = (
+        user_records: list[RelevantNewsTitlesResponse] = (
             await self._pinecone.get_relevant_title_records(
                 namespace=PINECONE_USER_CATEGORY_NAMESPACE, title=title, k=4
             )

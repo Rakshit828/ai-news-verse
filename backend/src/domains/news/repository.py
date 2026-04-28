@@ -18,8 +18,9 @@ from src.db.dependencies import get_session
 from src.response import AppError
 from src.domains.news.models import (
     CategoriesDataResponse,
-    UpdateUsersCategoryModel,
     SetUsersCategoryModel,
+    NewsResponse,
+    SubCategory as SubCatResponse,
 )
 from loguru import logger
 
@@ -83,16 +84,14 @@ class NewsCategoryRepository:
                 categories_dict[category_id] = {
                     "id": category_id,
                     "name": category_name,
-                    "subcategories": []
+                    "subcategories": [],
                 }
-            categories_dict[category_id]["subcategories"].append({
-                "id": subcategory_id,
-                "name": subcategory_name
-            })
+            categories_dict[category_id]["subcategories"].append(
+                {"id": subcategory_id, "name": subcategory_name}
+            )
 
         categories = list(categories_dict.values())
         return CategoriesDataResponse(categories=categories)
-
 
     async def get_subcategory_column(
         self, column: Literal["subcategory_id", "name"], session: AsyncSession
@@ -136,33 +135,46 @@ class NewsCategoryRepository:
         categories_data: SetUsersCategoryModel,
         session: AsyncSession,
     ):
+        """Set user's selected categories, handling add/remove operations."""
         subcategories: set[str] = set(categories_data.categories)
         user_subcategory_ids: list[str] = await self.get_user_subcategories_id(
             user_id=user_id, session=session
         )
-
+        logger.info(f"User subcategories : {user_subcategory_ids}")
+        
         construct_add_stmt = lambda subcategory_ids: insert(UserSubCategory).values(
             [
                 {"user_id": user_id, "subcategory_id": subcategory_id}
                 for subcategory_id in subcategory_ids
             ]
         )
-
-        if user_subcategory_ids is not None:
-            to_be_added = subcategories - set(user_subcategory_ids)
-            to_be_deleted = set(user_subcategory_ids) - subcategories
-
-            add_stmt = construct_add_stmt(to_be_added)
-            delete_stmt = delete(UserSubCategory).where(
-                UserSubCategory.user_id == user_id,
-                UserSubCategory.subcategory_id.in_(to_be_deleted),
-            )
-
-            await session.execute(add_stmt)
-            await session.execute(delete_stmt)
+        
+        if user_subcategory_ids:
+            user_subcategory_ids_set = set(user_subcategory_ids)
+            to_be_added = subcategories - user_subcategory_ids_set
+            to_be_deleted = user_subcategory_ids_set - subcategories
+            
+            logger.info(f"User subcategories to be added : {to_be_added}")
+            
+            # Only execute if there are items to add
+            if to_be_added:
+                add_stmt = construct_add_stmt(to_be_added)
+                await session.execute(add_stmt)
+            
+            # Only execute if there are items to delete
+            if to_be_deleted:
+                delete_stmt = delete(UserSubCategory).where(
+                    UserSubCategory.user_id == user_id,
+                    UserSubCategory.subcategory_id.in_(to_be_deleted),
+                )
+                await session.execute(delete_stmt)
         else:
-            add_stmt = construct_add_stmt(subcategories)
-            await session.execute(add_stmt)
+            # User has no existing categories, add all requested ones
+            if subcategories:
+                add_stmt = construct_add_stmt(subcategories)
+                await session.execute(add_stmt)
+        
+        await session.commit()
 
     async def delete_user_subcategories(
         self, user_id: str, subcategory_ids: List[str], session: AsyncSession
@@ -183,7 +195,7 @@ class NewsCategoryRepository:
         )
         result = await session.execute(statement)
         subcategory_ids = result.scalars().all()
-        return subcategory_ids if subcategory_ids else None
+        return list(map(str, subcategory_ids)) if subcategory_ids else None
 
     async def get_user_categories_id(
         self, user_id: str, session: AsyncSession
@@ -201,7 +213,52 @@ class NewsCategoryRepository:
 
 
 class NewsArticleRepository:
-    pass
+    async def get_news(
+        self,
+        session: AsyncSession,
+        subcategory_ids: list[str],
+        sources: list[str] | None = None,
+        cutoff_hours: int | None = None,
+    ) -> List[NewsResponse] | None:
+        cutoff_date = datetime.now() - timedelta(hours=cutoff_hours)
+        where_conditions = [
+            Articles.published_on >= cutoff_date,
+            Articles.subcategory_id.in_(subcategory_ids),
+        ]
+        if sources:
+            where_conditions.append(Articles.source.in_(sources))
+        stmt = (
+            select(
+                Articles.id,
+                Articles.title,
+                Articles.url,
+                Articles.source,
+                Articles.summary,
+                Articles.published_on,
+                Articles.metadatas,
+                Articles.featured_image,
+                SubCategory.id,
+                SubCategory.name,
+            )
+            .join(SubCategory, Articles.subcategory_id == SubCategory.id)
+            .where(*where_conditions)
+        )
+        result = await session.execute(stmt)
+        articles = [
+            NewsResponse(
+                id=row[0],
+                title=row[1],
+                url=row[2],
+                source=row[3],
+                summary=row[4],
+                published_on=row[5],
+                metadatas=row[6],
+                featured_image=row[7],
+                subcategory=SubCatResponse(id=row[8], name=row[9]),
+            )
+            for row in result
+        ]
+        return articles if articles else None
 
 
 async def main():
