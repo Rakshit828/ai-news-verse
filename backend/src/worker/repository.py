@@ -5,7 +5,7 @@ from src.db.schemas import Articles
 from src.worker.db import GetLocalSession
 from sqlalchemy.orm import Session
 from src.worker.news_service import WorkerNewsService
-from src.services.news_service.types import (
+from src.services.news_service.type import (
     ServiceArticle,
     ScrapedData,
     GoogleScrapedData,
@@ -16,10 +16,12 @@ from src.services.news_service.sources import (
     GoogleService,
     HackernoonService,
 )
-from src.services.ai.models import VDBClassificationResponse
-from src.services.ai.news_title_classification import VDBCategoryClassifierSync
+from src.services.ai import VDBClassificationResponse
+from src.services.ai import VDBCategoryClassifierSync
 from src.services.notification_system import CeleryPublisher
 from src.domains.news.models import NewNewsNotification
+from src.services.ai.ai_classifier import AiClassificationResponse
+from src._constants import SUBCATEGORY_ID_MAPPINGS
 
 
 class InvalidArgument(Exception):
@@ -50,8 +52,7 @@ def check_for_unique_titles(
 def prepare_messages_for_publishing(
     articles: List[ServiceArticle],
 ) -> List[NewNewsNotification]:
-    news: List[NewNewsNotification] = list()
-    news_articles = [
+    news: List[NewNewsNotification] = [
         NewNewsNotification(
             id=article.guid,
             title=article.title,
@@ -66,7 +67,7 @@ def prepare_messages_for_publishing(
         for article in articles
     ]
 
-    return news_articles
+    return news
 
 
 class NewsRepository:
@@ -125,9 +126,14 @@ class NewsRepository:
         if scrape_content:
             entry: ScrapedData = self.current_service.scrape_url(scraped_entry=entry)
         if classify:
-            classification: VDBClassificationResponse = self.classifier.run(
-                title=entry.title
-            )
+            if isinstance(self.current_service, GoogleService):
+                classification = VDBClassificationResponse(
+                    subcategory_id=SUBCATEGORY_ID_MAPPINGS[entry.category]
+                )
+            else:
+                classification: VDBClassificationResponse = self.classifier.run(
+                    title=entry.title
+                )
 
         service_article: ServiceArticle = self.current_service.to_service_article(
             entry=entry,
@@ -180,7 +186,7 @@ class NewsRepository:
                     no_of_articles += 1
             except Exception as e:
                 logger.error(f"Error processing entry {entry.id}: {str(e)}")
-                continue
+                raise e
 
         return no_of_articles
 
@@ -259,7 +265,9 @@ class NewsRepository:
 
         if pubsub is None:
             pubsub = CeleryPublisher()
-
+        logger.info(
+            f"Objects are : CLASSIFIER: {self.classifier}, OPENAI: {self.openai}, ANTHROPIC: {self.anthropic}, GOOGLE: {self.google}, HACKERNOON: {self.hackernoon}, DB: {self.db}, Celery: {pubsub}"
+        )
         entries: list[ScrapedData] = self.current_service.fetch_rss_feed(
             cutoff_hours=cutoff_hours
         )
@@ -318,9 +326,7 @@ class NewsRepository:
 def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:
     """Returns the list of rss urls with categories from database."""
     rss_urls = [
-        GoogleService.BASE_URL.format(
-            sub_category_query=subcategory_title.replace(" ", "-").lower()
-        )
+        GoogleService.BASE_URL.format(sub_category_query=subcategory_title.lower())
         for subcategory_title in subcategory_titles
     ]
     return rss_urls
@@ -354,7 +360,7 @@ def init_repository() -> NewsRepository:
 if __name__ == "__main__":
     repository: NewsRepository = init_repository()
     total_articles: int = repository.fetch_classify_and_save_articles(
-        source="ANTHROPIC",
+        source="HACKERNOON",
         cutoff_hours=24,
         commit_on_each=True,
         scrape_content=True,

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from loguru import logger
 
-from src.services.news_service.types import ServiceArticle
+from src.services.news_service.type import ServiceArticle
 from src.db.schemas import Articles, SubCategory
 
 

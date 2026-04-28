@@ -1,5 +1,4 @@
-"""Models for AI News Service"""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 import uuid
 from typing import Annotated
 
@@ -8,7 +7,7 @@ class AiClassificationResponse(BaseModel):
     category: str
 
 class VDBClassificationResponse(BaseModel):
-    category_id: str
+    category_id: str | None = None
     subcategory_id: str 
 
 class NewsTitleClassificationRecord(BaseModel):
@@ -21,6 +20,8 @@ class NewsTitleClassificationRecord(BaseModel):
     ]
     category_id: Annotated[str, "This refers to the category id. (uuid)"]
     subcategory_id: Annotated[str, "This refers to the subcategory id. (uuid)"]
+    category: str 
+    subcategory: str 
 
 
 class CategoryResponse(BaseModel):
@@ -28,6 +29,10 @@ class CategoryResponse(BaseModel):
     subcategory_id: str
 
 class RelevantNewsTitlesResponse(BaseModel):
-    _id: str
-    _score: float
-    fields: CategoryResponse
+    model_config = ConfigDict(populate_by_name=True)
+    
+    id: str = Field(alias="_id")
+    score: float = Field(alias="_score")
+    category_fields: "CategoryResponse" = Field(alias="fields")
+
+

@@ -10,7 +10,7 @@ from src.response import AppError
 from src.api.v1.auth_api import auth_routes
 from src.api.v1.news_service_api import news_routes
 from src.api.v1.monitoring_api import monitoring_routes
-from src.services.ai.components import PineconeServiceAsync, init_pinecone_db_async
+from src.services.ai import PineconeServiceAsync, init_pinecone_db_async
 from src.scripts._initialize_pinecone import run_init_pinecone_pipeline
 from src.scripts._initialize_categories import _initialize_categories
 from src.domains.news.repository import NewsCategoryRepository

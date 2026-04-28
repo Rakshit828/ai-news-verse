@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from src.services.ai.models import VDBClassificationResponse
 from typing import Dict, Type
-from src.services.news_service.types import ServiceArticle
+from src.services.news_service.type import ServiceArticle
 from pydantic import BaseModel
 
 

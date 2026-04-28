@@ -64,3 +64,10 @@ class NewNewsNotification(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class NewsTitleWithCategoryIds(BaseModel):
+    title: str 
+    subcategory: str 
+    subcategory_id: UUID
+    category: str 
+    category_id: UUID

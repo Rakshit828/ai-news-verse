@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
 from typing import Sequence, List, Literal, Tuple
 from datetime import datetime, timezone, time, timedelta
+import sqlalchemy.dialects.postgresql as pg
 
 
 from src.db.schemas import (
@@ -21,6 +22,7 @@ from src.domains.news.models import (
     SetUsersCategoryModel,
     NewsResponse,
     SubCategory as SubCatResponse,
+    NewsTitleWithCategoryIds,
 )
 from loguru import logger
 
@@ -55,7 +57,6 @@ class NewsCategoryRepository:
         result = await session.execute(statement)
         categories: List[Category] = result.unique().scalars().all()
         return CategoriesDataResponse(categories=categories) if categories else None
-    
 
     async def get_categories_data_of_user(
         self, user_id: str, session: AsyncSession
@@ -142,26 +143,26 @@ class NewsCategoryRepository:
             user_id=user_id, session=session
         )
         logger.info(f"User subcategories : {user_subcategory_ids}")
-        
+
         construct_add_stmt = lambda subcategory_ids: insert(UserSubCategory).values(
             [
                 {"user_id": user_id, "subcategory_id": subcategory_id}
                 for subcategory_id in subcategory_ids
             ]
         )
-        
+
         if user_subcategory_ids:
             user_subcategory_ids_set = set(user_subcategory_ids)
             to_be_added = subcategories - user_subcategory_ids_set
             to_be_deleted = user_subcategory_ids_set - subcategories
-            
+
             logger.info(f"User subcategories to be added : {to_be_added}")
-            
+
             # Only execute if there are items to add
             if to_be_added:
                 add_stmt = construct_add_stmt(to_be_added)
                 await session.execute(add_stmt)
-            
+
             # Only execute if there are items to delete
             if to_be_deleted:
                 delete_stmt = delete(UserSubCategory).where(
@@ -174,7 +175,7 @@ class NewsCategoryRepository:
             if subcategories:
                 add_stmt = construct_add_stmt(subcategories)
                 await session.execute(add_stmt)
-        
+
         await session.commit()
 
     async def delete_user_subcategories(
@@ -214,6 +215,45 @@ class NewsCategoryRepository:
 
 
 class NewsArticleRepository:
+    async def get_news_title_and_category_ids(
+        self, session: AsyncSession, per_category: int = 10
+    ) -> List[NewsTitleWithCategoryIds]:
+        from sqlalchemy import select, func
+
+        subquery = select(
+            Articles.title,
+            SubCategory.name.label("subcategory_name"),
+            Articles.subcategory_id,
+            Category.name.label("category_name"),
+            Category.id.label("category_id"),
+            func.row_number()
+            .over(
+                partition_by=Articles.subcategory_id,
+                order_by=Articles.published_on.desc(),
+            )
+            .label("row_num"),
+        ).subquery()
+
+        stmt = (
+            select(
+                subquery.c.title,
+                subquery.c.subcategory_name.label("subcategory"),
+                subquery.c.subcategory_id,
+                subquery.c.category_name.label("category"),
+                subquery.c.category_id,
+            )
+            .select_from(subquery)
+            .where(subquery.c.row_num <= per_category)
+        )
+
+        result = await session.execute(stmt)
+        articles = [
+            NewsTitleWithCategoryIds(**row._mapping)
+            for row in result.all()
+        ]
+        return articles
+
+
     async def get_news(
         self,
         session: AsyncSession,
@@ -263,9 +303,10 @@ class NewsArticleRepository:
 
 
 async def main():
-    repo = NewsCategoryRepository()
+    repo = NewsArticleRepository()
     async for session in get_session():
-        result = await repo.get_user_categories_id(user_id="")
+        result = await repo.get_news_title_and_category_ids(session, per_category=10)
+        print(result)
 
     print(result)
 

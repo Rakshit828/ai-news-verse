@@ -1,7 +1,8 @@
 import json
 from loguru import logger
-from src.services.ai.components import UseLLMsGroqAsync, GroqModelEnum, UseLLMsGroqSync
-from src.services.ai.models import AiClassificationResponse
+
+from .llms import UseLLMsGroqAsync, GroqModelEnum, UseLLMsGroqSync
+from .models import AiClassificationResponse
 
 
 def classify_news_topic_prompt(news_title: str, categories: list[str], news_description: str | None = None):

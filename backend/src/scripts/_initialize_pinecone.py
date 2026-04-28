@@ -6,18 +6,18 @@ import sqlalchemy.exc as exc
 import uuid
 
 
-from src.services.ai.components import PineconeServiceAsync
+from src.services.ai import PineconeServiceAsync
 from src.services.ai.models import (
     NewsTitleClassificationRecord,
     AiClassificationResponse,
 )
 from src.services.ai.ai_classifier import AiNewsClassifierAsync
-from src.services.ai.components import init_pinecone_db_async
+from src.services.ai import init_pinecone_db_async
 from src.domains.news.repository import NewsCategoryRepository
 from src.db.dependencies import get_session
 from src.domains.news.models import CategoriesDataResponse
 from src.services.news_service.sources import HackernoonService
-from src.services.news_service.types import HackerNoonScrapedData
+from src.services.news_service.type import HackerNoonScrapedData
 
 
 class PineconeInitializerAsync:

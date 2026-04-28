@@ -67,6 +67,7 @@ class GoogleScrapedData(BaseModel):
     id: str 
     title: str 
     link: str 
+    category: str 
     published_time: datetime
     news_source: GoogleSource
     markdown_content: str | None = None

@@ -1,14 +1,13 @@
 """This file defines the logic to classify the category and subcategory from the title."""
 
-from src.services.ai.components import (
+from .pinecone_db import (
     PineconeServiceAsync,
     PineconeServiceSync,
     init_pinecone_db_async,
     init_pinecone_db_sync,
 )
 
-from src.services.ai.models import VDBClassificationResponse, RelevantNewsTitlesResponse
-
+from src.services.ai.models import VDBClassificationResponse
 
 
 class VDBCategoryClassifierSync:
@@ -24,20 +23,23 @@ class VDBCategoryClassifierSync:
         self._pinecone.close()
 
     def run(
-        self, title: str, score_threshold: float = 0.3
+        self, title: str, score_threshold: float = 0.2
     ) -> VDBClassificationResponse:
-        related_titles: list[RelevantNewsTitlesResponse] = (
+        related_titles = (
             self._pinecone.get_relevant_news_titles(title=title, k=11)
         )
 
         subcat_freq = {}
         for record in related_titles:
-            if not record._score >= score_threshold:
+            if not record.score >= score_threshold:
                 continue
-            if record.fields.subcategory_id in subcat_freq:
-                subcat_freq[record.fields.subcategory_id] += 1
+            if record.category_fields.subcategory_id in subcat_freq:
+                subcat_freq[record.category_fields.subcategory_id] += 1
             else:
-                subcat_freq[record.fields.subcategory_id] = 1
+                subcat_freq[record.category_fields.subcategory_id] = 1
+        
+        if not subcat_freq:
+            raise Exception("Unable to be classified.")
 
         return VDBClassificationResponse(
             category_id=None, subcategory_id=max(subcat_freq, key=subcat_freq.get)
@@ -59,18 +61,19 @@ class VDBCategoryClassifierAsync:
     async def run(
         self, title: str, score_threshold: float = 0.3
     ) -> VDBClassificationResponse:
-        related_titles: list[RelevantNewsTitlesResponse] = (
+        related_titles: list[VDBClassificationResponse] = (
             await self._pinecone.get_relevant_news_titles(title=title, k=11)
         )
 
         subcat_freq = {}
         for record in related_titles:
-            if not record._score >= score_threshold:
+            if not record.score >= score_threshold:
                 continue
-            if record.fields.subcategory_id in subcat_freq:
-                subcat_freq[record.fields.subcategory_id] += 1
+            if record.category_fields.subcategory_id in subcat_freq:
+                subcat_freq[record.category_fields.subcategory_id] += 1
             else:
-                subcat_freq[record.fields.subcategory_id] = 1
+                subcat_freq[record.category_fields.subcategory_id] = 1
+
 
         return VDBClassificationResponse(
             category_id=None, subcategory_id=max(subcat_freq, key=subcat_freq.get)

@@ -2,7 +2,7 @@ from src.config import CONFIG
 from src.services.news_service._base import BaseNewsService, InvalidScraper
 from src.db.schemas import Source
 from src.services.news_service.jina_webscraper import JinaScraper
-from src.services.news_service.types import (
+from src.services.news_service.type import (
     OpenAIScrapedData,
     AnthropicScrapedData,
     HackerNoonScrapedData,
@@ -246,6 +246,7 @@ class GoogleService(BaseNewsService):
                                 link=entry.get("link"),
                                 news_source=entry.get("source"),
                                 published_time=published_time,
+                                category=rss_url.split("q=")[1],
                             )
                         )
                         seen_guids.add(guid)
@@ -253,6 +254,7 @@ class GoogleService(BaseNewsService):
         logger.info(f"Total entries in given cutoff is : {len(all_entries)}")
 
         return all_entries
+
 
 
 class AnthropicService(BaseNewsService):

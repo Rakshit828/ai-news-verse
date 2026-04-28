@@ -7,12 +7,13 @@ from pinecone.exceptions.exceptions import PineconeApiException
 from typing import List, Dict, Generator, Optional
 from loguru import logger
 from itertools import islice
-from src.services.ai.models import (
+
+from .models import (
     RelevantNewsTitlesResponse,
     NewsTitleClassificationRecord,
 )
 
-from src.services._constants import (
+from src._constants import (
     PINECONE_INDEX_NAME,
     NEWS_TITLES_CLASSIFICATION_NAMESPACE,
 )
@@ -163,9 +164,13 @@ class PineconeServiceSync:
                 },
                 fields=["category_id", "subcategory_id"],
             )
-            hits = result.get("result", {}).get("hits", [])
-
-            return [RelevantNewsTitlesResponse(**hit) for hit in hits]
+            hits = result.result.hits
+            return [
+                RelevantNewsTitlesResponse.model_validate(
+                    hit.to_dict() if hasattr(hit, "to_dict") else hit
+                )
+                for hit in hits
+            ]
 
         except PineconeApiException as exc:
             raise exc
@@ -225,7 +230,7 @@ if __name__ == "__main__":
     async def main():
         pinecone_client = await init_pinecone_db_async()
         result: List[RelevantNewsTitlesResponse] = (
-            await pinecone_client.get_relevant_title_records(
+            await pinecone_client.get_relevant_news_titles(
                 title="US is the most successful country in AI research after China.",
             )
         )
