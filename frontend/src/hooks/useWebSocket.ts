@@ -164,16 +164,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         reconnectTimerRef.current = null;
       }
       if (wsRef.current) {
-        // Only log warning if we are actually established; 
-        // otherwise stay silent to avoid "closed before established" console noise.
-        const shouldCloseSilently = wsRef.current.readyState === WebSocket.CONNECTING;
-        wsRef.current.onclose = null;
-        if (shouldCloseSilently) {
-           // We still have to close it to avoid leaks, but we can't fully 
-           // suppress the browser console warning without a longer timeout 
-           // or by never connecting in the first mount (the debounce handles this).
+        const ws = wsRef.current;
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+
+        if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+          ws.close();
         }
-        wsRef.current.close();
         wsRef.current = null;
       }
     };

@@ -1,14 +1,13 @@
 // src/context/WebSocketContext.tsx
 import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { useWebSocket, type WebSocketStatus } from "@/hooks/useWebSocket";
-import type { LiveNewsNotification } from "@/types/news.types";
-import type { Article } from "@/types/news.types";
+import type { LiveNewsNotification, NewsResponse } from "@/types/news.types";
 
 interface WebSocketContextValue {
     /** Current connection state */
     status: WebSocketStatus;
     /** Live articles received via WebSocket (newest first) */
-    liveArticles: Article[];
+    liveArticles: NewsResponse[];
     /** Count of unread live articles */
     unreadCount: number;
     /** Mark all current live articles as read */
@@ -23,32 +22,38 @@ interface WebSocketContextValue {
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 
 /**
- * Normalises a `LiveNewsNotification` (WS payload) into the same `Article`
- * shape used by the REST-fetched news so we can render them with the same card.
+ * Normalises a `LiveNewsNotification` (WS payload) into the `NewsResponse`
+ * shape used by the REST-fetched news.
  */
-function toArticle(n: LiveNewsNotification): Article {
+function toNewsResponse(n: LiveNewsNotification): NewsResponse {
     // The backend sends "OPNEAI" (typo) for OpenAI; normalise it.
     const source = n.source === "OPNEAI" ? "OPENAI" : n.source;
 
     return {
+        id: n.guid,
         title: n.title,
         url: n.link,
-        description: n.description ?? n.summary ?? "",
-        category_id: n.category_id,
-        subcategory_id: n.subcategory_id,
-        source: source as Article["source"],
+        source: source,
+        summary: n.summary || n.description,
+        published_on: new Date().toISOString(),
+        metadatas: null,
+        featured_image: null,
+        subcategory: {
+          id: n.subcategory_id,
+          name: "Live Update"
+        }
     };
 }
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
-    const [liveArticles, setLiveArticles] = useState<Article[]>([]);
+    const [liveArticles, setLiveArticles] = useState<NewsResponse[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
     const handleMessage = useCallback((raw: unknown) => {
         const notification = raw as LiveNewsNotification;
         if (!notification?.guid || !notification?.title) return; // guard
 
-        const article = toArticle(notification);
+        const article = toNewsResponse(notification);
 
         setLiveArticles((prev) => {
             // Deduplicate by guid (url)

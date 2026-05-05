@@ -52,7 +52,7 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true
 
       try {
-        await axiosInstance.get('/auth/refresh')
+        await axiosInstance.get('auth/refresh')
         processQueue(null)
         return axiosInstance(originalRequest)
       } catch (refreshError) {

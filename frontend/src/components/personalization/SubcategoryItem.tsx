@@ -1,64 +1,41 @@
 // src/components/personalization/SubcategoryItem.tsx
-import { Trash2, Sparkles } from "lucide-react";
+import { formatCategoryName } from "@/utils/format";
 
 interface SubcategoryItemProps {
   id: string;
   title: string;
   checked: boolean;
-  isCustom?: boolean;
   onToggle: (id: string, checked: boolean) => void;
-  onDelete?: (id: string) => void;
 }
 
 export default function SubcategoryItem({
   id,
   title,
   checked,
-  isCustom = false,
   onToggle,
-  onDelete,
 }: SubcategoryItemProps) {
   return (
     <div className={`subcategory-item ${checked ? "checked" : ""}`}>
-      <label className={`subcategory-label ${isCustom ? "no-checkbox" : ""}`}>
-        {!isCustom && (
-          <>
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={(e) => onToggle(id, e.target.checked)}
-              className="subcategory-checkbox"
+      <label className="subcategory-label">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onToggle(id, e.target.checked)}
+          className="subcategory-checkbox"
+        />
+        <span className="subcategory-check-custom">
+          <svg viewBox="0 0 12 10" fill="none" className="check-icon">
+            <path
+              d="M1 5L4.5 8.5L11 1.5"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-            <span className="subcategory-check-custom">
-              <svg viewBox="0 0 12 10" fill="none" className="check-icon">
-                <path
-                  d="M1 5L4.5 8.5L11 1.5"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-          </>
-        )}
-        <span className="subcategory-text">{title}</span>
-        {isCustom && (
-          <span className="custom-badge">
-            <Sparkles size={10} />
-            Custom
-          </span>
-        )}
+          </svg>
+        </span>
+        <span className="subcategory-text">{formatCategoryName(title)}</span>
       </label>
-      {isCustom && onDelete && (
-        <button
-          className="subcategory-delete"
-          onClick={() => onDelete(id)}
-          aria-label={`Delete subcategory ${title}`}
-        >
-          <Trash2 size={14} />
-        </button>
-      )}
 
       <style>{`
         .subcategory-item {
@@ -93,10 +70,6 @@ export default function SubcategoryItem({
           color: var(--color-text-primary);
           user-select: none;
           font-weight: 500;
-        }
-
-        .subcategory-label.no-checkbox {
-          cursor: default;
         }
 
         .subcategory-checkbox {
@@ -150,40 +123,6 @@ export default function SubcategoryItem({
         .subcategory-item.checked .subcategory-text {
           color: var(--color-accent);
           font-weight: 700;
-        }
-
-        .custom-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 10px;
-          font-weight: 700;
-          padding: 2px 8px;
-          border-radius: var(--radius-full);
-          background: var(--color-bg-badge);
-          color: var(--color-accent);
-          text-transform: uppercase;
-        }
-
-        .subcategory-delete {
-          width: 30px;
-          height: 30px;
-          border-radius: var(--radius-sm);
-          border: none;
-          background: transparent;
-          color: var(--color-text-tertiary);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all var(--transition-fast);
-          flex-shrink: 0;
-        }
-
-        .subcategory-delete:hover {
-          background: var(--color-error-light);
-          color: var(--color-error);
-          transform: scale(1.1);
         }
       `}</style>
     </div>

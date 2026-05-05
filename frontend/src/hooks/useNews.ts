@@ -1,13 +1,14 @@
 // src/hooks/useNews.ts
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { newsService } from "@/services/news.service";
 import { useCategoryStore } from "@/store/categoryStore";
 import type {
   SetUserCategoriesPayload,
   UpdateUserCategoriesPayload,
-  CreateCustomCategoryPayload,
-  CreateCustomSubcategoryPayload,
+  GetNewsParams,
+  PaginatedGetNewsResponse,
+  CategoriesDataResponse,
 } from "@/types/news.types";
 import type { AxiosError } from "axios";
 import type { ApiError } from "@/types/api.types";
@@ -22,28 +23,42 @@ export const newsKeys = {
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-/** All available categories (no auth required) */
+/** All available categories */
 export const useCategories = () => {
-  const { setCategories } = useCategoryStore();
+  const { categories, setCategories } = useCategoryStore();
 
   return useQuery({
-    // This defines the key for the cache.
     queryKey: newsKeys.categories(),
     queryFn: async () => {
       const res = await newsService.getCategories();
-      // make sure the store always has a real array for subcategories;
-      // backend may return `null`/`undefined` for legacy/empty cases.
-      const normalized = res.data.categories_data.map((c) => ({
-        ...c,
-        subcategories: c.subcategories ?? [],
+      
+      // Safety check: ensure res and res.data exist
+      if (!res?.data) {
+        return { categories: [] };
+      }
+
+      // Handle both 'categories' and 'categories_data' for backward compatibility
+      // and defensive mapping for 'id' vs 'category_id' etc.
+      const rawCategories = (res.data as any).categories || (res.data as any).categories_data || [];
+
+      const normalized = rawCategories.map((c: any) => ({
+        id: c.id || c.category_id,
+        name: c.name || c.title,
+        subcategories: (c.subcategories || c.sub_categories || []).map((sc: any) => ({
+          id: sc.id || sc.subcategory_id,
+          name: sc.name || sc.title
+        }))
       }));
+
       setCategories(normalized);
-      return res.data;
+      return { categories: normalized };
     },
+    initialData: categories.length > 0 ? { categories: categories } : undefined,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 };
 
-/** Categories the currently logged-in user has selected */
+/** Categories the user has selected */
 export const useUserCategories = () =>
   useQuery({
     queryKey: newsKeys.userCategories(),
@@ -51,19 +66,36 @@ export const useUserCategories = () =>
       const res = await newsService.getUserCategories();
       return res.data;
     },
+    staleTime: 1000 * 60 * 10,
   });
 
-/** Today's news articles for the user's selected categories */
-export const useTodayNews = () =>
-  useQuery({
-    queryKey: newsKeys.todayNews(),
-    queryFn: async () => {
-      const res = await newsService.getTodayNews();
-      return res.data;
+/** Infinite news scrolling */
+export const useInfiniteTodayNews = (params: Omit<GetNewsParams, "id" | "next_published_on">) =>
+  useInfiniteQuery({
+    queryKey: [...newsKeys.todayNews(), params],
+    queryFn: async ({ pageParam }) => {
+      // Map cursor properties to expected API parameters
+      let cursorParams: any = {};
+      if (pageParam && typeof pageParam === 'object') {
+        const p = pageParam as any;
+        cursorParams = {
+          id: p.id,
+          // Handle both 'created_at' from cursor and 'next_published_on' from type
+          next_published_on: p.next_published_on || p.created_at,
+        };
+      }
+
+      const res = await newsService.getTodayNews({
+        ...params,
+        ...cursorParams,
+      });
+      return res?.data || { news: [], limit: 10, next_cursor: null };
+    },
+    initialPageParam: null,
+    getNextPageParam: (lastPage: PaginatedGetNewsResponse) => {
+      return lastPage?.next_cursor || undefined;
     },
   });
-
-
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
@@ -100,88 +132,3 @@ export const useUpdateCategories = () => {
     },
   });
 };
-
-export const useCreateCustomCategory = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (payload: CreateCustomCategoryPayload) =>
-      newsService.createCustomCategory(payload),
-    onSuccess: (res) => {
-      // If we got back the full categories data, update the cache directly
-      if ("categories_data" in res.data) {
-        queryClient.setQueryData(newsKeys.userCategories(), res.data);
-      } else {
-        // For other cases (AlreadyExists/SimilarExists), we might still want to refresh
-        // but since the component handles the ID mapping, we can just invalidate
-        queryClient.invalidateQueries({ queryKey: newsKeys.userCategories() });
-      }
-      toast.success(res.message);
-    },
-    onError: (error: AxiosError<ApiError>) => {
-      toast.error(
-        error.response?.data?.message ?? "Failed to create category.",
-      );
-    },
-  });
-};
-
-
-export const useDeleteCustomCategory = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (categoryId: string) => newsService.deleteCustomCategory(categoryId),
-    onSuccess: (res) => {
-      queryClient.setQueryData(newsKeys.userCategories(), res.data);
-      toast.success(res.message);
-    },
-    onError: (error: AxiosError<ApiError>) => {
-      toast.error(
-        error.response?.data?.message ?? "Failed to delete category."
-      )
-    }
-  })
-}
-
-export const useCreateCustomSubcategory = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (payload: CreateCustomSubcategoryPayload) =>
-      newsService.createCustomSubcategory(payload),
-    onSuccess: (res) => {
-      // If we got back the full categories data, update the cache directly
-      if ("categories_data" in res.data) {
-        queryClient.setQueryData(newsKeys.userCategories(), res.data);
-      } else {
-        // For other cases (AlreadyExists/SimilarExists), we might still want to refresh
-        // but since the component handles the ID mapping, we can just invalidate
-        queryClient.invalidateQueries({ queryKey: newsKeys.userCategories() });
-      }
-      toast.success(res.message);
-    },
-    onError: (error: AxiosError<ApiError>) => {
-      toast.error(
-        error.response?.data?.message ?? "Failed to create subcategory.",
-      );
-    },
-  });
-};
-
-
-export const useDeleteCustomSubcategory = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (subcategoryId: string) => newsService.deleteCustomSubcategory(subcategoryId),
-    onSuccess: (res) => {
-      queryClient.setQueryData(newsKeys.userCategories(), res.data);
-      toast.success(res.message);
-    },
-    onError: (error: AxiosError<ApiError>) => {
-      toast.error(
-        error.response?.data?.message ?? "Failed to delete subcategory."
-      )
-    }
-  })
-}

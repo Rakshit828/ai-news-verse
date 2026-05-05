@@ -2,88 +2,43 @@
 import { axiosInstance } from "@/lib/axiosInstance";
 import type { ApiResponse } from "@/types/api.types";
 import type {
-  CategoryDataResponse,
+  CategoriesDataResponse,
   SetUserCategoriesPayload,
   UpdateUserCategoriesPayload,
-  CreateCustomCategoryPayload,
-  CreateCustomSubcategoryPayload,
-  CategoryAlreadyExistsResponse,
-  SimilarCategoryExistsResponse,
-  SubcategoryAlreadyExistsResponse,
-  SimilarSubcategoryExistsResponse,
-  TodayNewsResponse,
+  PaginatedGetNewsResponse,
+  GetNewsParams,
 } from "@/types/news.types";
 
-// helper unions for the payloads that can come back from the
-// custom‑category endpoints. `axios` automatically wraps the response in
-// the standard envelope, so our helper types represent unions of the data
-// field rather than the outer object.
-
-type CreateCategoryResult = ApiResponse<
-  | CategoryDataResponse
-  | CategoryAlreadyExistsResponse
-  | SimilarCategoryExistsResponse
->;
-
-type CreateSubcategoryResult = ApiResponse<
-  | CategoryDataResponse
-  | SubcategoryAlreadyExistsResponse
-  | SimilarSubcategoryExistsResponse
->;
+const BASE_PATH = "news";
 
 export const newsService = {
-  /** GET /news/category — all app-defined categories (no auth required) */
+  /** GET /api/v1/news/category — all app-defined categories */
   getCategories: () =>
     axiosInstance
-      .get<ApiResponse<CategoryDataResponse>>("/news/category")
+      .get<ApiResponse<CategoriesDataResponse>>(`${BASE_PATH}/category`)
       .then((res) => res.data),
 
-  /** GET /news/category/me — categories selected by the logged-in user */
+  /** GET /api/v1/news/category/me — categories selected by the logged-in user */
   getUserCategories: () =>
     axiosInstance
-      .get<ApiResponse<CategoryDataResponse>>("/news/category/me")
+      .get<ApiResponse<CategoriesDataResponse>>(`${BASE_PATH}/category/me`)
       .then((res) => res.data),
 
-  /** POST /news/category — set user's categories for the first time */
+  /** POST /api/v1/news/category — set user's categories */
   setUserCategories: (payload: SetUserCategoriesPayload) =>
     axiosInstance
-      .post<ApiResponse<CategoryDataResponse>>("/news/category", payload)
+      .post<ApiResponse<CategoriesDataResponse>>(`${BASE_PATH}/category`, payload)
       .then((res) => res.data),
 
-  /** PUT /news/category — update user's existing category selection */
+  /** PUT /api/v1/news/category — update user's existing category selection */
   updateUserCategories: (payload: UpdateUserCategoriesPayload) =>
     axiosInstance
-      .put<ApiResponse<CategoryDataResponse>>("/news/category", payload)
+      .put<ApiResponse<CategoriesDataResponse>>(`${BASE_PATH}/category`, payload)
       .then((res) => res.data),
 
-  /** POST /news/category/custom — create a new custom category */
-  createCustomCategory: (payload: CreateCustomCategoryPayload) =>
+  /** GET /api/v1/news/today — today's news articles with pagination */
+  getTodayNews: (params: GetNewsParams) =>
     axiosInstance
-      .post<CreateCategoryResult>("/news/category/custom", payload)
-      .then((res) => res.data),
-  
-  /** DELETE /news/remove/category/{category_id} — remove a custom category */
-  deleteCustomCategory: (categoryId: string) =>
-    axiosInstance
-      .delete<ApiResponse<CategoryDataResponse>>(`/news/remove/category/${categoryId}`)
-      .then((res) => res.data),
-
-  /** POST /news/subcategory/custom — add a subcategory to an existing category */
-  createCustomSubcategory: (payload: CreateCustomSubcategoryPayload) =>
-    axiosInstance
-      .post<CreateSubcategoryResult>("/news/subcategory/custom", payload)
-      .then((res) => res.data),
-  
-  /** DELETE /news/remove/subcategory/{subcategory_id} — remove a custom subcategory */
-  deleteCustomSubcategory: (subcategoryId: string) =>
-    axiosInstance
-      .delete<ApiResponse<CategoryDataResponse>>(`/news/remove/subcategory/${subcategoryId}`)
-      .then((res) => res.data),
-
-      
-  /** GET /news/today — today's news articles for the user's selected categories */
-  getTodayNews: () =>
-    axiosInstance
-      .get<ApiResponse<TodayNewsResponse>>("/news/today")
+      .get<ApiResponse<PaginatedGetNewsResponse>>(`${BASE_PATH}/today`, { params })
       .then((res) => res.data),
 };

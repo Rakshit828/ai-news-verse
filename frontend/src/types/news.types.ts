@@ -1,95 +1,61 @@
+// src/types/news.types.ts
 
 // ─── Category / Subcategory ───────────────────────────────────────────────────
 
 export interface SubCategory {
-  subcategory_id: string;
-  title: string;
+  id: string;
+  name: string;
 }
 
 export interface Category {
-  category_id: string;
-  title: string;
-  /**
-   * categories coming from the backend may not always have a list of
-   * subcategories (the Pydantic model marks this field as `Optional`).
-   * In practice the API serialiser produces an empty array, but the type
-   * reflects the possibility of `null`/`undefined` so callers can handle
-   * it safely.
-   */
-  subcategories?: SubCategory[] | null;
+  id: string;
+  name: string;
+  subcategories: SubCategory[];
 }
 
-export interface CategoryDataResponse {
-  categories_data: Category[];
+export interface CategoriesDataResponse {
+  categories: Category[];
 }
 
 // Payloads for setting / updating user categories
-export interface SetCategoriesData {
-  category_id: string;
-  subcategories: string[]; // subcategory UUIDs
-}
-
+// Schema shows SetUsersCategoryModel: { categories: string[] } (array of subcategory IDs)
 export interface SetUserCategoriesPayload {
-  categories_data: SetCategoriesData[];
+  categories: string[];
 }
 
 export interface UpdateUserCategoriesPayload {
-  categories_data: SetCategoriesData[];
-}
-
-// ─── Custom Category / Subcategory Creation ───────────────────────────────────
-
-export interface CreateCustomCategoryPayload {
-  title: string;
-}
-
-export interface CreateCustomSubcategoryPayload {
-  title: string;
-  category_id: string;
-}
-
-/** Backend response when the exact category already belongs to another user */
-export interface CategoryAlreadyExistsResponse {
-  category_id: string;
-  category_title: string;
-}
-
-/** Backend response when a semantically similar category exists */
-export interface SimilarCategoryExistsResponse {
-  category_id: string;
-  category_title: string;
-}
-
-/** Backend response when the exact subcategory already exists */
-export interface SubcategoryAlreadyExistsResponse {
-  subcategory_id: string;
-  subcategory_title: string;
-}
-
-/** Backend response when a semantically similar subcategory exists */
-export interface SimilarSubcategoryExistsResponse {
-  subcategory_id: string;
-  subcategory_title: string;
+  categories: string[];
 }
 
 // ─── News / Articles ──────────────────────────────────────────────────────────
 
 export type NewsSource = "GOOGLE" | "ANTHROPIC" | "OPENAI" | "HACKERNOON";
 
-export interface Article {
+export interface NewsResponse {
+  id: string;
   title: string;
   url: string;
-  description: string;
-  category_id: string | null;
-  subcategory_id: string | null;
   source: NewsSource;
+  summary: string | null;
+  published_on: string;
+  metadatas: Record<string, any> | null;
+  featured_image: string | null;
+  subcategory: SubCategory;
 }
 
-export interface TodayNewsResponse {
-  google?: Article[];
-  anthropic?: Article[];
-  openai?: Article[];
-  hackernoon?: Article[];
+export interface PaginatedGetNewsResponse {
+  limit: number;
+  next_cursor: Record<string, any> | null;
+  news: NewsResponse[];
+}
+
+export interface GetNewsParams {
+  cutoff: number;
+  subcats?: string[];
+  sources?: string[];
+  limit?: number;
+  id?: string;
+  next_published_on?: string;
 }
 
 // ─── WebSocket Live Notification ──────────────────────────────────────────────
@@ -99,7 +65,7 @@ export interface LiveNewsNotification {
   guid: string;
   title: string;
   link: string;
-  source: NewsSource | "OPNEAI"; // backend has a typo for OPENAI in some places
+  source: string;
   category_id: string | null;
   subcategory_id: string;
   description: string | null;
