@@ -22,6 +22,7 @@ from src.services.notification_system import CeleryPublisher
 from src.domains.news.models import NewNewsNotification
 from src.services.ai.ai_classifier import AiClassificationResponse
 from src._constants import SUBCATEGORY_ID_MAPPINGS
+from src.utils import timeit
 
 
 class InvalidArgument(Exception):
@@ -117,12 +118,13 @@ class NewsRepository:
         )
         return False if check is None else True
 
+    @timeit
     def scrape_url_and_classify(
         self,
         entry: ScrapedData,
         scrape_content: bool = True,
         classify: bool = True,
-    ) -> ServiceArticle:
+    ) -> ServiceArticle | None:
         if scrape_content:
             entry: ScrapedData = self.current_service.scrape_url(scraped_entry=entry)
         if classify:
@@ -131,9 +133,11 @@ class NewsRepository:
                     subcategory_id=SUBCATEGORY_ID_MAPPINGS[entry.category]
                 )
             else:
-                classification: VDBClassificationResponse = self.classifier.run(
+                classification: VDBClassificationResponse | None = self.classifier.run(
                     title=entry.title
                 )
+        if classification is None:
+            return None
 
         service_article: ServiceArticle = self.current_service.to_service_article(
             entry=entry,
@@ -162,11 +166,14 @@ class NewsRepository:
         no_of_articles = 0
         for entry in entries:
             try:
-                service_article: ServiceArticle = self.scrape_url_and_classify(
+                service_article: ServiceArticle | None = self.scrape_url_and_classify(
                     entry=entry,
                     scrape_content=scrape_content,
                     classify=classify,
                 )
+                if service_article is None:
+                    logger.info(f"Not saving the article {entry.title}")
+                    continue
                 logger.info(f"Article processed: {service_article.title}")
 
                 if service_article is not None:
@@ -360,8 +367,8 @@ def init_repository() -> NewsRepository:
 if __name__ == "__main__":
     repository: NewsRepository = init_repository()
     total_articles: int = repository.fetch_classify_and_save_articles(
-        source="HACKERNOON",
-        cutoff_hours=24,
+        source="ANTHROPIC",
+        cutoff_hours=100,
         commit_on_each=True,
         scrape_content=True,
         classify=True,

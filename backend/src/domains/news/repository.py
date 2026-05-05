@@ -1,9 +1,9 @@
 import uuid
 import json
 from uuid import UUID
-from sqlalchemy import select, delete, insert, func
+from sqlalchemy import select, delete, insert, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, with_loader_criteria, joinedload
+from sqlalchemy.orm import joinedload
 from typing import Sequence, List, Literal, Tuple
 from datetime import datetime, timezone, time, timedelta
 import sqlalchemy.dialects.postgresql as pg
@@ -23,6 +23,7 @@ from src.domains.news.models import (
     NewsResponse,
     SubCategory as SubCatResponse,
     NewsTitleWithCategoryIds,
+    PaginatedGetNewsResponse,
 )
 from loguru import logger
 
@@ -261,14 +262,37 @@ class NewsArticleRepository:
         subcategory_ids: list[str],
         sources: list[str] | None = None,
         cutoff_hours: int | None = None,
+        limit: int | None = None,
+        next_cursor: dict | None = None,
     ) -> List[NewsResponse] | None:
+        if limit is None:
+            limit = 20
+
         cutoff_date = datetime.now() - timedelta(hours=cutoff_hours)
         where_conditions = [
-            Articles.published_on >= cutoff_date,
             Articles.subcategory_id.in_(subcategory_ids),
+            Articles.published_on > cutoff_date
         ]
         if sources:
             where_conditions.append(Articles.source.in_(sources))
+
+        if (
+            next_cursor
+            and (next_published_on := next_cursor.get("next_published_on")) is not None
+            and (next_id := next_cursor.get("id")) is not None
+        ):
+            logger.info(f"Statement from next cursor: ")
+            where_conditions.append(
+                or_(
+                    Articles.published_on < next_published_on,
+                    and_(
+                        Articles.published_on == next_published_on,
+                        Articles.id < next_id,
+                    ),
+                )
+            )
+    
+
         stmt = (
             select(
                 Articles.id,
@@ -284,7 +308,13 @@ class NewsArticleRepository:
             )
             .join(SubCategory, Articles.subcategory_id == SubCategory.id)
             .where(*where_conditions)
+            .order_by(Articles.published_on.desc(), Articles.id.desc())
         )
+        if limit:
+            stmt = stmt.limit(limit)
+
+        logger.info(f"[SQL] {stmt}")
+
         result = await session.execute(stmt)
         articles = [
             NewsResponse(
@@ -300,7 +330,19 @@ class NewsArticleRepository:
             )
             for row in result
         ]
-        return articles if articles else None
+        return (
+            PaginatedGetNewsResponse(
+                limit=limit,
+                next_cursor={
+                    "subcategory_ids": subcategory_ids,
+                    "id": articles[-1].id,
+                    "created_at": articles[-1].published_on,
+                },
+                news=articles,
+            )
+            if articles
+            else None
+        )
 
 
 async def main():

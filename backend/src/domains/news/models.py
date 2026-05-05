@@ -23,6 +23,11 @@ class NewsResponse(BaseModel):
     featured_image: Optional[str]
     subcategory: SubCategory
 
+class PaginatedGetNewsResponse(BaseModel):
+    limit: int = Field(default=10)
+    next_cursor: dict | None = None
+    news: List[NewsResponse]
+
 
 class Category(BaseModel):
     category_id: UUID = Field(alias="id")

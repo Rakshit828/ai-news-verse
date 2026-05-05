@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.ext.asyncio.session import AsyncSession
+from datetime import datetime
 
 from src.domains.auth.dependencies import AccessTokenBearer, AccessTokenBearerForWS
 from src.domains.news.models import (
     SetUsersCategoryModel,
     CategoriesDataResponse,
-    NewsResponse,
+    PaginatedGetNewsResponse,
 )
 from src.domains.news.repository import NewsArticleRepository, NewsCategoryRepository
 from src.utils import safely_run_controllers
@@ -15,7 +16,6 @@ from src.db.main import Session
 from src.response import SuccessResponse
 from loguru import logger
 
-
 news_routes = APIRouter()
 
 
@@ -24,7 +24,7 @@ async def websocket_endpoint(
     websocket: WebSocket,
     token_data=Depends(AccessTokenBearerForWS()),
     category_repo: NewsCategoryRepository = Depends(NewsCategoryRepository),
-    pubsub: PubSubSystem = Depends(get_pubsub_system)
+    pubsub: PubSubSystem = Depends(get_pubsub_system),
 ):
     user_id = token_data["sub"]
     logger.debug(f"Client {user_id} is trying to connect.")
@@ -33,7 +33,9 @@ async def websocket_endpoint(
 
     async with Session() as session:
         subcategory_ids: list[str] = await safely_run_controllers(
-            func=category_repo.get_user_subcategories_id, user_id=user_id, session=session
+            func=category_repo.get_user_subcategories_id,
+            user_id=user_id,
+            session=session,
         )
 
     try:
@@ -163,17 +165,26 @@ async def delete_custom_category(
     )
 
 
-@news_routes.get("/today", response_model=SuccessResponse[NewsResponse])
+@news_routes.get("/today", response_model=SuccessResponse[PaginatedGetNewsResponse])
 async def get_latest_news(
     cutoff: int,
     subcats: list[str] | None = Query(None),
     sources: list[str] | None = Query(None),
+    limit: int | None = Query(None, le=20),
+    id: str | None = Query(None),
+    next_published_on: datetime | None = Query(None),
     decoded_token=Depends(AccessTokenBearer()),
     session: AsyncSession = Depends(get_session),
     category_repo: NewsCategoryRepository = Depends(NewsCategoryRepository),
     article_repo: NewsArticleRepository = Depends(NewsArticleRepository),
 ):
     user_id = decoded_token["sub"]
+    next_cursor = {}
+    if id is not None and next_published_on is not None:
+        next_cursor.update({"id": id, "next_published_on": next_published_on})
+    
+    logger.info(f"Next cursor: {next_cursor}")
+    
     if subcats is None:
         subcats = await category_repo.get_user_subcategories_id(
             user_id=user_id, session=session
@@ -181,14 +192,16 @@ async def get_latest_news(
         if subcats is None:
             raise Exception("Please define subcategories.")
 
-    today_news_response: list[NewsResponse] | None = await safely_run_controllers(
+    today_news_response: PaginatedGetNewsResponse | None = await safely_run_controllers(
         article_repo.get_news,
         session=session,
         cutoff_hours=cutoff,
         sources=sources,
         subcategory_ids=subcats,
+        limit=limit,
+        next_cursor=next_cursor,
     )
-    return SuccessResponse[list[NewsResponse] | None](
+    return SuccessResponse[PaginatedGetNewsResponse | None](
         status_code=status.HTTP_200_OK,
         message="Returned News Successfully",
         data=today_news_response,

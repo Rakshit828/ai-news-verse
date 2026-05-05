@@ -6,6 +6,7 @@ from .pinecone_db import (
     init_pinecone_db_async,
     init_pinecone_db_sync,
 )
+from loguru import logger
 
 from src.services.ai.models import VDBClassificationResponse
 
@@ -24,7 +25,7 @@ class VDBCategoryClassifierSync:
 
     def run(
         self, title: str, score_threshold: float = 0.2
-    ) -> VDBClassificationResponse:
+    ) -> VDBClassificationResponse | None:
         related_titles = (
             self._pinecone.get_relevant_news_titles(title=title, k=11)
         )
@@ -39,7 +40,8 @@ class VDBCategoryClassifierSync:
                 subcat_freq[record.category_fields.subcategory_id] = 1
         
         if not subcat_freq:
-            raise Exception("Unable to be classified.")
+            logger.info(f"News with title : {title} cannot be classified. Returning None.")
+            return None
 
         return VDBClassificationResponse(
             category_id=None, subcategory_id=max(subcat_freq, key=subcat_freq.get)
