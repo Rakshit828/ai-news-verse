@@ -130,7 +130,9 @@ class NewsRepository:
         if classify:
             if isinstance(self.current_service, GoogleService):
                 classification = VDBClassificationResponse(
-                    subcategory_id=SUBCATEGORY_ID_MAPPINGS[entry.category]
+                    subcategory_id=SUBCATEGORY_ID_MAPPINGS[
+                        entry.category.lower().replace("&", "and")
+                    ]
                 )
             else:
                 classification: VDBClassificationResponse | None = self.classifier.run(
