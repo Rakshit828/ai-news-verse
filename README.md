@@ -1,9 +1,27 @@
 # 🚀 AI NewsVerse
 
-An news aggregation platform that delivers deeply personalized, curated insights from premium sources.
+An news aggregation platform that delivers personalized, curated insights from various sources.
 
 
-## 📡 Tech Stack
+# What is it?
+It is a AI related news aggregation news platform where we can get various AI updates happening 
+daily. This is for anyone who is interested in AI updates and want to keep themselves above the 
+curve.
+
+# Problem Statement
+AI is developing very rapidly. It is difficult for people to keep up with new updates. It is 
+hard to go through various news articles or news letters daily. And the hard part is finding the
+updates that actually matter and the updates about the various domains of AI that you are interested
+in.
+
+# Solution
+AI NewsVerse is a simple step to solve this problem by following ways:
+- Gathering news through diverse and important sources like OpenAI, Anthropic, Google, MIT AI etc.
+- Classifiying those news as various subdomains within the domain of AI.
+- Presenting it to the users in a simple way.
+
+
+## 📡 Tech Stacks
 
 ### Backend
 - **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Asynchronous Python)
@@ -27,13 +45,19 @@ An news aggregation platform that delivers deeply personalized, curated insights
 
 - **🤖 AI-Driven Classification:** News articles are automatically classified into categories and subcategories using semantic vector search (Pinecone).
 - **🎭 Personalization:** Users can create custom categories and subcategories. The system validates them using AI to ensure they are meaningful topics.
-- **⚡ Real-time Updates:** Stay updated with live news feeds powered by WebSockets and notification systems.
+- **⚡ Real-time Updates:** Stay updated with live news feeds powered by WebSockets and redis pub/sub.
 - **📦 Background Processing:** Robust background workers (Celery) periodically fetch news from diverse RSS feeds and process them without affecting application performance.
 ---
 
 ## 🐛 Known Issues
 - News Classification may be inaccurate sometimes.
 - There may be websocket scalability issue.
+
+
+## Future Planned Upgrades
+- Training a ML Model for news classification.
+- Deep Personalization of feed and updates.
+  
 
 ## 🚀 Getting Started
 
