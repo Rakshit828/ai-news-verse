@@ -1,9 +1,10 @@
 from src.config import CONFIG
 
 from pinecone import PineconeAsyncio, Pinecone
-from pinecone.db_data.index import Index
-from pinecone.db_data.index_asyncio import _IndexAsyncio
-from pinecone.exceptions.exceptions import PineconeApiException
+from pinecone.index import Index
+import pinecone as pc
+from pinecone.async_client import AsyncIndex
+from pinecone.exceptions import PineconeApiException
 from typing import List, Dict, Generator, Optional
 from loguru import logger
 from itertools import islice
@@ -22,9 +23,9 @@ from src._constants import (
 class PineconeServiceAsync:
     """Provides async interface for interacting with pinecone vector database."""
 
-    def __init__(self, client: PineconeAsyncio, index: _IndexAsyncio):
+    def __init__(self, client: PineconeAsyncio, index: AsyncIndex):
         self._client: PineconeAsyncio | None = client
-        self._index: _IndexAsyncio | None = index
+        self._index: AsyncIndex | None = index
 
     @classmethod
     async def create(cls, index_name: str, api_key: str, host: str):
@@ -66,10 +67,8 @@ class PineconeServiceAsync:
         try:
             result = await self._index.search(
                 namespace=namespace,
-                query={
-                    "inputs": {"text": f"{title}"},
-                    "top_k": k,
-                },
+                top_k=k,
+                inputs={"text": f"{title}"},
                 fields=["topic", "category_id", "subcategory_id"],
             )
             hits = result.get("result", {}).get("hits", [])
@@ -119,6 +118,7 @@ class PineconeServiceSync:
         self._client: Pinecone | None = client
         self._index: Index | None = index
 
+
     @classmethod
     def create(cls, index_name: str, api_key: str, host: str):
         """Creates new pinecone client with new asyncio client and index."""
@@ -134,7 +134,8 @@ class PineconeServiceSync:
                     "field_map": {"text": "title", "dimension": 2048},
                 },
             )
-        index = client.Index(host=host)
+        index = client.index(host=host)
+        
         return cls(client, index)
 
     def close(self) -> None:
@@ -158,13 +159,12 @@ class PineconeServiceSync:
         try:
             result = self._index.search(
                 namespace=namespace,
-                query={
-                    "inputs": {"text": f"{title}"},
-                    "top_k": k,
-                },
-                fields=["category_id", "subcategory_id"],
+                top_k=k,
+                inputs={"text": f"{title}"},
+                fields=["topic", "category_id", "subcategory_id"],
             )
             hits = result.result.hits
+
             return [
                 RelevantNewsTitlesResponse.model_validate(
                     hit.to_dict() if hasattr(hit, "to_dict") else hit

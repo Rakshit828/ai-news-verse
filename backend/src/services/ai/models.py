@@ -2,13 +2,16 @@ from pydantic import BaseModel, Field, ConfigDict
 import uuid
 from typing import Annotated
 
+
 class AiClassificationResponse(BaseModel):
     is_valid: bool
     category: str
 
+
 class VDBClassificationResponse(BaseModel):
     category_id: str | None = None
-    subcategory_id: str 
+    subcategory_id: str
+
 
 class NewsTitleClassificationRecord(BaseModel):
     """This is the record for storing the news title with its classification."""
@@ -20,19 +23,18 @@ class NewsTitleClassificationRecord(BaseModel):
     ]
     category_id: Annotated[str, "This refers to the category id. (uuid)"]
     subcategory_id: Annotated[str, "This refers to the subcategory id. (uuid)"]
-    category: str 
-    subcategory: str 
+    category: str
+    subcategory: str
 
 
 class CategoryResponse(BaseModel):
     category_id: str
     subcategory_id: str
 
+
 class RelevantNewsTitlesResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    
-    id: str = Field(alias="_id")
-    score: float = Field(alias="_score")
+
+    id: str = Field(alias="id_")
+    score: float = Field(alias="score_")
     category_fields: "CategoryResponse" = Field(alias="fields")
-
-

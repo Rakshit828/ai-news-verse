@@ -9,7 +9,6 @@ from src.services.news_service.type import (
     GoogleScrapedData,
 )
 from src.services.news_service.markdown import MarkdownImageExtractor
-
 from datetime import datetime, timedelta, timezone
 import feedparser
 from loguru import logger
@@ -224,6 +223,10 @@ class GoogleService(BaseNewsService):
         cutoff_time = now - timedelta(hours=cutoff_hours)
         seen_guids = set()
         for rss_url in self.rss_urls:
+            rss_url = rss_url.replace(" ", "-")
+
+            logger.info(f"url is : {rss_url}")
+            
             feed = feedparser.parse(rss_url)
 
             if not feed.entries:

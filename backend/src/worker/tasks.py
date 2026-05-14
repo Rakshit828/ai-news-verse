@@ -36,6 +36,7 @@ def fetch_classify_notify(
         return no_articles
 
     except Exception as exc:
+        repo.classifier.close_pc_connection()
         logger.error(f"Error in fetch_classify_notify for {source}: {str(exc)}")
         # Retry with exponential backoff
         raise self.retry(exc=exc, countdown=60)

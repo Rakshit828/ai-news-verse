@@ -333,7 +333,7 @@ class NewsRepository:
 def contruct_google_rss_urls(subcategory_titles: list[str]) -> list[str]:
     """Returns the list of rss urls with categories from database."""
     rss_urls = [
-        GoogleService.BASE_URL.format(sub_category_query=subcategory_title.lower())
+        GoogleService.BASE_URL.format(sub_category_query=subcategory_title)
         for subcategory_title in subcategory_titles
     ]
     return rss_urls
@@ -347,7 +347,7 @@ def init_repository() -> NewsRepository:
     google_rss_urls: list[str] = contruct_google_rss_urls(
         subcategory_titles=subcategory_titles
     )
-
+    logger.debug(f"Google urls are : {google_rss_urls}")
     classifier = VDBCategoryClassifierSync.create()
     openai = OpenAiService.create()
     google = GoogleService.create(rss_urls=google_rss_urls)
@@ -367,8 +367,8 @@ def init_repository() -> NewsRepository:
 if __name__ == "__main__":
     repository: NewsRepository = init_repository()
     total_articles: int = repository.fetch_classify_and_save_articles(
-        source="ANTHROPIC",
-        cutoff_hours=100,
+        source="GOOGLE",
+        cutoff_hours=1000,
         commit_on_each=True,
         scrape_content=True,
         classify=True,
