@@ -268,7 +268,7 @@ class NewsArticleRepository:
         cutoff_hours: int | None = None,
         limit: int | None = None,
         next_cursor: dict | None = None,
-    ) -> List[NewsResponse] | None:
+    ) -> PaginatedGetNewsResponse | None:
         if limit is None:
             limit = 20
 

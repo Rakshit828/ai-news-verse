@@ -20,7 +20,8 @@ app.conf.update(
 )
 
 
-NEWS_REFETCH_INTERVAL_SECONDS = 5 * 60  # 5 minutes
+NEWS_REFETCH_INTERVAL_SECONDS = 20 * 60  # 5 minutes
+GOOGLE_NEWS_REFETCH = 30 * 60  # 30 minutes
 
 
 CELERY_BEAT_SCHEDULE = {
@@ -41,7 +42,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "fetch_classify_notify_google": {
         "task": "src.worker.tasks.fetch_classify_notify",
-        "schedule": NEWS_REFETCH_INTERVAL_SECONDS,
+        "schedule": GOOGLE_NEWS_REFETCH,
         "args": ("GOOGLE",),
     },
 }

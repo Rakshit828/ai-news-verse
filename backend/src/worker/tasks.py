@@ -25,7 +25,7 @@ def fetch_classify_notify(
             source=source,
             cutoff_hours=24,
             commit_on_each=True,
-            scrape_content=False,
+            scrape_content=True,
         )
 
         repo.classifier.close_pc_connection()
