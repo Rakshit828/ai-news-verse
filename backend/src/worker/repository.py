@@ -127,11 +127,12 @@ class NewsRepository:
     ) -> ServiceArticle | None:
         if scrape_content:
             entry: ScrapedData = self.current_service.scrape_url(scraped_entry=entry)
+            logger.info(f"Article {entry.title} scraped with: [IMAGE]: {entry.featured_image}")
         if classify:
             if isinstance(self.current_service, GoogleService):
                 classification = VDBClassificationResponse(
                     subcategory_id=SUBCATEGORY_ID_MAPPINGS[
-                        entry.category.lower().replace("&", "and")
+                        entry.category.lower()
                     ]
                 )
             else:
@@ -271,9 +272,7 @@ class NewsRepository:
 
         if pubsub is None:
             pubsub = CeleryPublisher()
-        logger.info(
-            f"Objects are : CLASSIFIER: {self.classifier}, OPENAI: {self.openai}, ANTHROPIC: {self.anthropic}, GOOGLE: {self.google}, HACKERNOON: {self.hackernoon}, DB: {self.db}, Celery: {pubsub}"
-        )
+        
         entries: list[ScrapedData] = self.current_service.fetch_rss_feed(
             cutoff_hours=cutoff_hours
         )
@@ -288,7 +287,7 @@ class NewsRepository:
             entries = unique_entries
 
         all_guids = {entry.id for entry in entries}
-        logger.debug(f"{len(all_guids)} entries scraped from {source}")
+        logger.debug(f"{len(all_guids)} entries fetched from {source} rss feed.")
 
         # Get existing GUIDs to avoid duplicates
         with GetLocalSession() as session:
@@ -346,7 +345,7 @@ def init_repository() -> NewsRepository:
     google_rss_urls: list[str] = contruct_google_rss_urls(
         subcategory_titles=subcategory_titles
     )
-    logger.debug(f"Google urls are : {google_rss_urls}")
+
     classifier = VDBCategoryClassifierSync.create()
     openai = OpenAiService.create()
     google = GoogleService.create(rss_urls=google_rss_urls)

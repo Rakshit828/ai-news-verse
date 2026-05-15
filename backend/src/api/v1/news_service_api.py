@@ -32,11 +32,13 @@ async def websocket_endpoint(
     logger.info(f"Client with id: {user_id} connected successfully.")
 
     async with Session() as session:
-        subcategory_ids: list[str] = await safely_run_controllers(
-            func=category_repo.get_user_subcategories_id,
-            user_id=user_id,
-            session=session,
+        subcategory_ids: list[str] = await category_repo.get_user_subcategories_id(
+            user_id=user_id, session=session
         )
+        if subcategory_ids is None:
+            subcategory_ids = await category_repo.get_subcategory_column(
+                column="subcategory_id", session=session
+            )
 
     try:
         await pubsub.listen_multiple(channels=subcategory_ids, websocket=websocket)
@@ -189,8 +191,11 @@ async def get_latest_news(
         subcats = await category_repo.get_user_subcategories_id(
             user_id=user_id, session=session
         )
-        if subcats is None:
-            raise Exception("Please define subcategories.")
+        if subcats in [None, []]:
+            subcats = await category_repo.get_subcategory_column(
+                column="subcategory_id", session=session
+            )
+        
 
     today_news_response: PaginatedGetNewsResponse | None = await safely_run_controllers(
         article_repo.get_news,

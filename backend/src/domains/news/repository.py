@@ -102,11 +102,15 @@ class NewsCategoryRepository:
         """Returns all the value in the given column of Subcategory table."""
         match (column):
             case "subcategory_id":
-                statement = select(SubCategory.subcategory_id)
+                statement = select(SubCategory.id)
             case "name":
                 statement = select(SubCategory.name)
 
         result = (await session.execute(statement)).scalars().all()
+
+        if not isinstance(result[0], str):
+            result = list(map(str, result))
+
         return result if result else None
 
     async def get_category_column(
