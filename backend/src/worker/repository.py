@@ -183,10 +183,7 @@ class NewsRepository:
                         article: Articles = self.db.create_article(
                             article=service_article, session=session
                         )
-                        logger.info(
-                            f"Article saved: {article.title}, GUID: {article.id}"
-                        )
-
+                        
                     # Publishing to redis.
                     news_messages: List[NewNewsNotification] = (
                         prepare_messages_for_publishing(articles=[service_article])

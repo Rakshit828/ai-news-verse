@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from loguru import logger
+from sqlalchemy import exc
 
 from src.services.news_service.type import ServiceArticle
 from src.db.schemas import Articles, SubCategory
@@ -47,8 +48,15 @@ class WorkerNewsService:
             )
             session.add(db_article)
             session.commit()
-            logger.debug(f"Article created: {db_article.id} - {db_article.title}")
+            logger.debug(f"Article Saved: {db_article.id} - {db_article.title}")
             return db_article
+        except exc.IntegrityError as e:
+            session.rollback()
+
+            logger.error(
+                f"Integrity error creating article: [TITLE]:{db_article.title}, [ID]: {db_article.id}. Skipping this error."
+            )
+
         except Exception as e:
             session.rollback()
             logger.error(f"Error creating article: {str(e)}")
