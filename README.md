@@ -36,8 +36,6 @@ AI NewsVerse is a simple step to solve this problem by following ways:
 - **Styling:** [Tailwind CSS 4](https://tailwindcss.com/)
 - **State Management:** [Zustand](https://github.com/pmndrs/zustand)
 - **Data Fetching:** [TanStack Query v5](https://tanstack.com/query/latest)
-- **Icons:** [Lucide React](https://lucide.dev/)
-- **Notifications:** [React Hot Toast](https://react-hot-toast.com/)
 
 ---
 
